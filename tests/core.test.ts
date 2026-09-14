@@ -47,3 +47,11 @@ test('same-line easing has room to settle, while line returns are immediate', ()
   assert.equal(travelDuration(240, false), 72);
   assert.equal(travelDuration(240, true), 0);
 });
+test('group size and palette are bounded and migrate safely', () => {
+  assert.equal(sanitizeSettings().groupSize, 1);
+  assert.equal(sanitizeSettings({ groupSize: 99 }).groupSize, 4);
+  assert.equal(sanitizeSettings({ groupSize: NaN }).groupSize, 1);
+  assert.equal(sanitizeSettings({ groupSize: -3 }).groupSize, 1);
+  assert.equal(sanitizeSettings({ color: 'blue' }).color, 'blue');
+  assert.equal(sanitizeSettings({ color: 'invalid' as any }).color, 'green');
+});

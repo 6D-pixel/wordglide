@@ -327,6 +327,17 @@ test('first-use introduction can be dismissed, reopened, and stays dismissed on 
   await page.getByRole('button', { name: 'Expand reading controls' }).click();
   await page.getByRole('button', { name: 'How to use WordGlide' }).click();
   await expect(page.locator('.welcome')).toBeVisible();
+  await expect(page.locator('.tour-next')).toBeDisabled();
+  await page.locator('[data-tour-word="1"]').click();
+  await page.locator('.tour-next').click();
+  await expect(page.locator('.tour-next')).toBeDisabled();
+  await page.getByRole('slider', { name: 'Practice words per minute' }).fill('300');
+  await page.locator('.tour-next').click();
+  await page.getByRole('button', { name: 'Play practice', exact: true }).click();
+  await expect(page.locator('[data-tour-word="2"]')).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: 'Pause practice', exact: true }).click();
+  await expect(page.locator('.tour-progress')).toHaveText('Practice complete');
+  expect((await command(tabId, { type: 'snapshot' })).settings.wpm).toBe(250);
   await page.locator('.intro-start').click();
   await expect.poll(async () => (await command(tabId, { type: 'snapshot' })).status).toBe('picking-start');
   await command(tabId, { type: 'dispose' });
@@ -343,10 +354,121 @@ test('popup introduction does not require page access and migrates existing pref
   await expect(popup.locator('.welcome')).toBeVisible();
   await expect(popup.locator('.intro-start')).toHaveText('Choose my start word');
   await popup.locator('body').screenshot({ path: 'test-results/welcome-popup.png' });
+  await popup.locator('[data-tour-word="0"]').click();
+  await popup.locator('.tour-next').click();
+  await popup.getByRole('slider', { name: 'Practice words per minute' }).fill('300');
+  await popup.locator('.tour-next').click();
+  await popup.locator('.tour-play').click();
+  await expect(popup.locator('[data-tour-word="1"]')).toHaveAttribute('aria-pressed', 'true');
+  await popup.locator('.tour-play').click();
+  await expect(popup.locator('.tour-progress')).toHaveText('Practice complete');
+  await expect(popup.locator('#error')).toBeEmpty();
   await popup.locator('.intro-dismiss').click();
   await expect(popup.getByRole('spinbutton', { name: 'Words per minute' })).toHaveValue('320');
   await expect(popup.locator('button[data-shape="hand"]')).toHaveAttribute('aria-pressed', 'true');
   await popup.reload();
   await expect(popup.locator('.welcome')).toBeHidden();
   await popup.close();
+});
+
+test('dot sweeps from the leading edge, continues late in each word, and has a fading trail', async () => {
+  const { page, tabId } = await open();
+  await command(tabId, { type: 'pick-start' });
+  const first = await point(page, '#first', 'Start'); await page.mouse.click(first.x, first.y);
+  await command(tabId, { type: 'settings', settings: { cursorShape: 'dot', wpm: 60, natural: false } });
+  const x = () => page.locator('.marker').evaluate(el => el.getBoundingClientRect().left + el.getBoundingClientRect().width / 2);
+  const left = await x(); expect(left).toBeLessThan(first.x - 10);
+  await command(tabId, { type: 'play' });
+  await page.waitForTimeout(180); const early = await x();
+  expect(early).toBeGreaterThan(left);
+  await expect(page.locator('.trail-dot').first()).toBeAttached();
+  await page.waitForTimeout(350); const middle = await x();
+  await page.waitForTimeout(200); const late = await x();
+  expect(middle).toBeGreaterThan(early + 5); expect(late).toBeGreaterThan(middle + 5);
+  await page.screenshot({ path: 'test-results/dot-trail.png' });
+  await command(tabId, { type: 'pause' }); const frozen = await x();
+  await expect(page.locator('.trail-dot')).toHaveCount(0);
+  await page.waitForTimeout(160); expect(await x()).toBeCloseTo(frozen, 1);
+  await command(tabId, { type: 'play' }); expect(await x()).toBeGreaterThanOrEqual(frozen - 1);
+  await page.close();
+});
+
+test('dot respects reduced motion and color selection survives reactivation', async () => {
+  const { page, tabId } = await open();
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.locator('[data-color="blue"]').click();
+  await command(tabId, { type: 'settings', settings: { cursorShape: 'dot', wpm: 60, natural: false } });
+  await expect(page.locator('.marker')).toHaveCSS('color', 'rgb(37, 99, 235)');
+  const x = () => page.locator('.marker').evaluate(el => el.getBoundingClientRect().left);
+  await command(tabId, { type: 'play' }); const first = await x();
+  await page.waitForTimeout(250); expect(await x()).toBeCloseTo(first, 1);
+  await expect(page.locator('.trail-dot')).toHaveCount(0);
+  await command(tabId, { type: 'dispose' });
+  await worker.evaluate(async id => { await chrome.scripting.executeScript({ target: { tabId: id }, files: ['content.js'] }); }, tabId);
+  expect((await command(tabId, { type: 'snapshot' })).settings.color).toBe('blue');
+  await page.close();
+});
+
+test('highlight groups cover up to four words and retain per-word timing and inclusive end', async () => {
+  const { page, tabId } = await open();
+  await command(tabId, { type: 'pick-start' });
+  const first = await point(page, '#first', 'Start'); await page.mouse.click(first.x, first.y);
+  await command(tabId, { type: 'pick-end' });
+  const last = await point(page, '#first a', 'words'); await page.mouse.click(last.x, last.y);
+  await page.locator('[data-mode="highlight"]').click();
+  await page.getByRole('combobox', { name: 'Words per highlight' }).selectOption('4');
+  await command(tabId, { type: 'settings', settings: { wpm: 600, natural: false } });
+  const linked = await point(page, '#first a', 'linked');
+  const r = await page.locator('.fragment').first().boundingBox();
+  expect(r!.x).toBeLessThan(first.x); expect(r!.x + r!.width).toBeGreaterThan(linked.x);
+  expect(r!.x + r!.width).toBeLessThan(last.x);
+  const initial = await command(tabId, { type: 'play' }); const began = Date.now();
+  await page.waitForTimeout(230);
+  expect((await command(tabId, { type: 'snapshot' })).index).toBe(initial.index);
+  await expect.poll(async () => (await command(tabId, { type: 'snapshot' })).status).toBe('finished');
+  const finished = await command(tabId, { type: 'snapshot' });
+  expect(finished.word).toBe('words'); expect(finished.index).toBe(finished.end);
+  expect(Date.now() - began).toBeGreaterThanOrEqual(480);
+  expect(await worker.evaluate(async () => (await chrome.storage.local.get('settings')).settings)).toMatchObject({ groupSize: 4 });
+  await page.close();
+});
+
+test('group sizes increase coverage and stop at paragraph boundaries', async () => {
+  const { page, tabId } = await open();
+  await command(tabId, { type: 'pick-start' });
+  const first = await point(page, '#first', 'Start'); await page.mouse.click(first.x, first.y);
+  const widths: number[] = [];
+  for (const groupSize of [1, 2, 3, 4]) {
+    await command(tabId, { type: 'settings', settings: { mode: 'highlight', groupSize } });
+    widths.push((await page.locator('.fragment').first().boundingBox())!.width);
+  }
+  expect(widths.every((w, i) => !i || w > widths[i - 1])).toBe(true);
+  await page.screenshot({ path: 'test-results/group-highlight.png' });
+  await command(tabId, { type: 'pick-start' });
+  const last = await point(page, '#first', 'curiosity'); await page.mouse.click(last.x, last.y);
+  await expect(page.locator('.fragment')).toHaveCount(1);
+  expect((await page.locator('.fragment').boundingBox())!.height).toBeLessThan(40);
+  await page.close();
+});
+
+test('dot line returns clear old trails without diagonal travel', async () => {
+  const { page, tabId } = await open();
+  await command(tabId, { type: 'pick-start' });
+  const last = await point(page, '#first', 'curiosity'); await page.mouse.click(last.x, last.y);
+  await command(tabId, { type: 'settings', settings: { cursorShape: 'dot', wpm: 120, natural: false } });
+  const samples = page.evaluate(async () => {
+    const shadow = document.querySelector('[data-wordglide]')!.shadowRoot!;
+    const points: { y: number; trailY: number[] }[] = []; const began = performance.now();
+    while (performance.now() - began < 750) {
+      await new Promise(requestAnimationFrame);
+      points.push({ y: shadow.querySelector('.marker')!.getBoundingClientRect().top, trailY: [...shadow.querySelectorAll('.trail-dot')].map(el => el.getBoundingClientRect().top) });
+    }
+    return points;
+  });
+  await command(tabId, { type: 'play' });
+  const points = await samples;
+  const changes = points.slice(1).map((p, i) => p.y - points[i].y).filter(d => Math.abs(d) > .1);
+  expect(changes.length).toBe(1); expect(changes[0]).toBeGreaterThan(50);
+  expect(points.every(p => p.trailY.every(y => Math.abs(y - p.y) < 12))).toBe(true);
+  await page.close();
 });

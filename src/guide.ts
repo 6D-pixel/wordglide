@@ -1,4 +1,4 @@
-import { defaults, type CursorShape, type Settings } from './core.ts';
+import { defaults, palette, type CursorShape, type Settings } from './core.ts';
 
 // Fixed viewBoxes preserve the proportions at every user-selected size.
 export function cursorIcon(shape: CursorShape): string {
@@ -14,11 +14,15 @@ export const guideCSS = `
   .marker svg{width:100%;height:100%;display:block;overflow:visible}
   .fragment{border-radius:4px;background:#edc96155;will-change:transform,width;height:auto}
   .fragment.outline{background:transparent;border:var(--guide-stroke,2px) solid #5d8150}
+  .trail-dot{position:fixed;left:0;top:0;border-radius:50%;pointer-events:none;animation:trail-fade 180ms linear forwards}
+  @keyframes trail-fade{from{opacity:.3}to{opacity:0}}
 `;
 
 export class Guide {
   readonly marker = document.createElement('div');
   readonly fragments = document.createElement('div');
+  readonly trail = document.createElement('div');
+  private lastDot?: { x: number; y: number };
   private settings: Settings = { ...defaults };
   private lastRects: DOMRect[] = [];
   private visible = false;
@@ -27,7 +31,8 @@ export class Guide {
     this.marker.className = 'guide marker';
     this.marker.setAttribute('aria-hidden', 'true');
     this.fragments.setAttribute('aria-hidden', 'true');
-    shadow.append(this.marker, this.fragments);
+    this.trail.setAttribute('aria-hidden', 'true');
+    shadow.append(this.trail, this.marker, this.fragments);
     this.configure(this.settings);
   }
 
@@ -40,6 +45,8 @@ export class Guide {
     this.marker.style.width = `${settings.cursorSize}px`;
     this.marker.style.height = `${settings.cursorSize}px`;
     this.marker.style.setProperty('--guide-stroke', String(settings.thickness));
+    this.marker.style.color = palette[settings.color];
+    this.trail.replaceChildren(); this.lastDot = undefined;
     this.fragments.style.setProperty('--guide-stroke', `${settings.thickness}px`);
   }
 
@@ -68,13 +75,14 @@ export class Guide {
       const top = this.settings.cursorShape === 'dot' ? 7 / 32 : this.settings.cursorShape === 'arrow' ? 3 / 32 : 2 / 32;
       this.marker.style.display = 'block';
       this.marker.style.transition = transition;
-      this.marker.style.transform = `translate3d(${r.left + r.width / 2 - size * anchor}px,${r.bottom + 3 - size * top}px,0)`;
+      this.marker.style.transform = `translate3d(${r.left + (this.settings.cursorShape === 'dot' ? 0 : r.width / 2) - size * anchor}px,${r.bottom + 3 - size * top}px,0)`;
     } else {
       this.marker.style.display = 'none';
       while (this.fragments.childElementCount > rects.length) this.fragments.lastElementChild!.remove();
       rects.forEach((r, i) => {
         const el = (this.fragments.children[i] ?? this.fragments.appendChild(document.createElement('div'))) as HTMLElement;
         el.className = `fragment ${this.settings.mode === 'outline' ? 'outline' : ''}`;
+        el.style.borderColor = palette[this.settings.color];
         el.style.transition = transition;
         el.style.transform = `translate3d(${r.left - 2}px,${r.top - 1}px,0)`;
         el.style.width = `${r.width + 4}px`;
@@ -85,6 +93,7 @@ export class Guide {
   }
 
   freeze() {
+    this.trail.replaceChildren(); this.lastDot = undefined;
     // Read the rendered positions before any writes; resume starts here, not at
     // the previous word or at the CSS transition's unfinished destination.
     const elements = [this.marker, ...this.fragments.children] as HTMLElement[];
@@ -93,7 +102,40 @@ export class Guide {
   }
 
   hide() {
+    this.trail.replaceChildren(); this.lastDot = undefined;
     this.marker.style.display = 'none'; this.marker.style.transition = 'none';
     this.fragments.replaceChildren(); this.visible = false; this.lastRects = [];
+  }
+
+  // Drive the dot from the reader's clock: sweep the whole word and inter-word
+  // gap, never jump to its centre. Wrapped fragments get separate line sweeps.
+  sweep(rects: DOMRect[], next: DOMRect | undefined, progress: number, animate: boolean) {
+    if (!rects.length) { this.hide(); return; }
+    const lines: DOMRect[] = [];
+    for (const r of rects) {
+      const prior = lines.at(-1);
+      if (prior && Math.abs(prior.top - r.top) < 4) {
+        const left = Math.min(prior.left, r.left);
+        lines[lines.length - 1] = new DOMRect(left, prior.top, Math.max(prior.right, r.right) - left, Math.max(prior.height, r.height));
+      } else lines.push(r);
+    }
+    const total = lines.reduce((n, r) => n + r.width, 0);
+    let distance = Math.min(1, Math.max(0, progress)) * total;
+    let r = lines[0];
+    for (let i = 0; i < lines.length; i++) { r = lines[i]; if (distance <= r.width || i === lines.length - 1) break; distance -= r.width; }
+    const target = r === lines.at(-1) && next && Math.abs(next.top - r.top) < 4 && next.left >= r.right ? next.left : r.right;
+    const x = r.left + (target - r.left) * Math.min(1, distance / Math.max(1, r.width));
+    const size = this.settings.cursorSize, y = r.bottom + 3 + size * 9 / 32;
+    if (animate && this.lastDot && Math.abs(y - this.lastDot.y) < 4 && x > this.lastDot.x && x - this.lastDot.x < 80) {
+      const dot = document.createElement('i'); dot.className = 'trail-dot';
+      const diameter = size * 12 / 32;
+      dot.style.cssText = `width:${diameter}px;height:${diameter}px;background:${palette[this.settings.color]};transform:translate3d(${this.lastDot.x - diameter / 2}px,${y - diameter / 2}px,0)`;
+      this.trail.append(dot);
+      dot.addEventListener('animationend', () => dot.remove(), { once: true });
+      while (this.trail.childElementCount > 16) this.trail.firstElementChild!.remove();
+    } else if (!animate || (this.lastDot && Math.abs(y - this.lastDot.y) >= 4)) this.trail.replaceChildren();
+    this.lastDot = { x, y };
+    this.marker.style.display = 'block'; this.marker.style.transition = 'none';
+    this.marker.style.transform = `translate3d(${x - size / 2}px,${y - size / 2}px,0)`;
   }
 }

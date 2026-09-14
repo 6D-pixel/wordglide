@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.0
+
+- Continuous leading-edge dot sweep with a short fading trail and clean line returns.
+- Highlight groups of 1–4 words with per-word timing and inclusive passage boundaries.
+- Six standard cursor/outline colors, saved alongside existing appearance preferences.
+- Interactive practice walkthrough: select a word, change speed, and try play/pause without altering the page.
+
 ## 0.2.0
 
 - Smooth browser-managed motion for cursor, highlight, and outline modes, using the RSVP Reader follow-along timing.

@@ -20,6 +20,7 @@ async function initialize() {
   let tokens: Token[] = [];
   let status: Status = 'idle';
   let index = 0, start = 0, end = 0;
+  let activeEnd = 0;
   let message = '';
   let disposed = false;
   let ready!: () => void;
@@ -88,9 +89,26 @@ async function initialize() {
     return rectCache.get(token.id)!;
   }
   function hideGuide() { guide.hide(); }
+  function groupEnd() {
+    let last = index;
+    if (settings.mode !== 'highlight') return last;
+    const first = rects(tokens[index])[0];
+    while (last < end && last - index + 1 < settings.groupSize) {
+      const next = tokens[last + 1], box = rects(next)[0];
+      if (next.block !== tokens[index].block || !first || !box || Math.abs(first.top - box.top) >= 4) break;
+      last++;
+    }
+    return last;
+  }
+  function guideRects(last = groupEnd()) { return tokens.slice(index, last + 1).flatMap(rects); }
+  function isDot() { return settings.mode === 'cursor' && settings.cursorShape === 'dot'; }
+  function sweepDot(progress: number, animate = !reduced.matches) {
+    guide.sweep(rects(tokens[index]), index < end ? rects(tokens[index + 1])[0] : undefined, reduced.matches ? 0 : progress, animate);
+  }
   function drawStatic() {
     if (disposed || status.startsWith('picking') || !tokens[index]) return;
-    guide.move(rects(tokens[index]));
+    if (isDot()) sweepDot(wordDuration ? elapsed / wordDuration : 0, false);
+    else guide.move(guideRects());
   }
   function chooseRoot(next: HTMLElement, useSelection = false) {
     pause(); root = next; tokens = indexRoot(next); geometryRecovery.clear(); index = start = 0; end = Math.max(0, tokens.length - 1);
@@ -193,12 +211,14 @@ async function initialize() {
     const token = tokens[index];
     if (scrollToToken(token, beginWord)) return;
     rectCache.clear(); geometryDirty = false;
-    const list = rects(token);
+    activeEnd = groupEnd();
+    const list = guideRects(activeEnd);
     if (!list.length) { pause('This word has no visible position. Scroll it into view and resume.'); return; }
     avoidToolbar(list);
-    wordDuration = durationFor(token, token.paragraphEnd, settings);
+    wordDuration = tokens.slice(index, activeEnd + 1).reduce((total, t) => total + durationFor(t, t.paragraphEnd, settings), 0);
     began = performance.now(); lastFrame = began;
-    guide.move(list, reduced.matches ? 0 : Math.min(travelDuration(wordDuration, false), Math.max(0, wordDuration - elapsed)));
+    if (isDot()) sweepDot(elapsed / wordDuration);
+    else guide.move(list, reduced.matches ? 0 : Math.min(travelDuration(wordDuration, false), Math.max(0, wordDuration - elapsed)));
     publish(false); raf = requestAnimationFrame(frame);
   }
   function frame(now: number) {
@@ -212,12 +232,13 @@ async function initialize() {
     lastFrame = now;
     const needsLayout = geometryDirty;
     if (geometryDirty) { rectCache.clear(); geometryDirty = false; }
-    const list = rects(tokens[index]);
+    const list = guideRects(activeEnd);
     if (!list.length) { pause('The current word is not visible. Scroll to it and resume.'); return; }
-    if (needsLayout) guide.move(list);
+    if (isDot()) sweepDot((elapsed + now - began) / wordDuration);
+    else if (needsLayout) guide.move(list);
     if (elapsed + now - began >= wordDuration) {
-      if (index >= end) { status = 'finished'; elapsed = 0; message = 'Passage complete. Take a breath, or read it again.'; publish(); return; }
-      index++; elapsed = 0; scrollAttempts = 0; beginWord();
+      if (activeEnd >= end) { index = end; status = 'finished'; elapsed = 0; message = 'Passage complete. Take a breath, or read it again.'; publish(); return; }
+      index = activeEnd + 1; elapsed = 0; scrollAttempts = 0; beginWord();
     } else raf = requestAnimationFrame(frame);
   }
   function play() {
@@ -251,9 +272,13 @@ async function initialize() {
       case 'step': pause(); leavePicking(); index = Math.max(start, Math.min(end, index + Math.sign(command.delta ?? 1))); elapsed = 0; drawStatic(); break;
       case 'settings': {
         const previous = settings;
+        const playing = status === 'playing';
+        if (playing) pause();
         settings = sanitizeSettings({ ...settings, ...command.settings });
         void chrome.storage.local.set({ settings }).catch(() => {});
-        if (settings.mode !== previous.mode || settings.cursorShape !== previous.cursorShape || settings.cursorSize !== previous.cursorSize || settings.thickness !== previous.thickness) { guide.configure(settings); drawStatic(); }
+        guide.configure(settings);
+        if (settings.mode !== previous.mode || settings.groupSize !== previous.groupSize) elapsed = 0;
+        if (playing) play(); else drawStatic();
         break;
       }
       case 'dispose': dispose(); break;
@@ -280,6 +305,7 @@ async function initialize() {
     disposed = true; epoch++; cancelAnimationFrame(raf); clearTimeout(rebuildTimer); abort.abort();
     observer.disconnect(); navigationObserver.disconnect(); resizeObserver.disconnect();
     renderUI.dispose();
+    guide.hide();
     try { chrome.runtime.onMessage.removeListener(listener); } catch { /* An extension update may have invalidated this context. */ }
     host.remove();
     if (context.__wordglide?.build === __BUILD_ID__) delete context.__wordglide;
