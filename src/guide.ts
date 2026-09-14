@@ -1,0 +1,99 @@
+import { defaults, type CursorShape, type Settings } from './core.ts';
+
+// Fixed viewBoxes preserve the proportions at every user-selected size.
+export function cursorIcon(shape: CursorShape): string {
+  const common = 'viewBox="0 0 32 32" fill="#fffdf5" stroke="currentColor" stroke-width="var(--guide-stroke,2)" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"';
+  if (shape === 'dot') return `<svg ${common}><circle cx="16" cy="16" r="9" fill="currentColor" stroke="#fffdf5" stroke-width="1.5"/></svg>`;
+  if (shape === 'arrow') return `<svg ${common}><path d="M7 3v24l6-6 5 9 5-3-5-9h9Z"/></svg>`;
+  return `<svg ${common}><path d="M11 17V5a3 3 0 0 1 6 0v8a2.5 2.5 0 0 1 5 0v2a2.5 2.5 0 0 1 5 0v2a2 2 0 0 1 4 0v5c0 4-3 8-7 8h-8c-2.5 0-4-1-5.5-3L4 20a2.7 2.7 0 0 1 4-3.5l3 3.5Z" transform="translate(-1 0) scale(.97)"/></svg>`;
+}
+
+export const guideCSS = `
+  .guide,.fragment{position:fixed;left:0;top:0;pointer-events:none;box-sizing:border-box;will-change:transform;}
+  .marker{display:none;color:#386c46;filter:drop-shadow(0 1px 1px #193b3826)}
+  .marker svg{width:100%;height:100%;display:block;overflow:visible}
+  .fragment{border-radius:4px;background:#edc96155;will-change:transform,width;height:auto}
+  .fragment.outline{background:transparent;border:var(--guide-stroke,2px) solid #5d8150}
+`;
+
+export class Guide {
+  readonly marker = document.createElement('div');
+  readonly fragments = document.createElement('div');
+  private settings: Settings = { ...defaults };
+  private lastRects: DOMRect[] = [];
+  private visible = false;
+
+  constructor(shadow: ShadowRoot) {
+    this.marker.className = 'guide marker';
+    this.marker.setAttribute('aria-hidden', 'true');
+    this.fragments.setAttribute('aria-hidden', 'true');
+    shadow.append(this.marker, this.fragments);
+    this.configure(this.settings);
+  }
+
+  configure(settings: Settings) {
+    const previous = this.settings;
+    this.settings = settings;
+    if (settings.mode !== previous.mode) this.hide();
+    if (!this.marker.firstChild || settings.cursorShape !== previous.cursorShape) this.marker.innerHTML = cursorIcon(settings.cursorShape);
+    this.marker.dataset.shape = settings.cursorShape;
+    this.marker.style.width = `${settings.cursorSize}px`;
+    this.marker.style.height = `${settings.cursorSize}px`;
+    this.marker.style.setProperty('--guide-stroke', String(settings.thickness));
+    this.fragments.style.setProperty('--guide-stroke', `${settings.thickness}px`);
+  }
+
+  move(rects: DOMRect[], duration = 0) {
+    if (!rects.length) { this.hide(); return; }
+    // A single word can cross text nodes (read<em>ing</em>). Those rects are
+    // fragments of ONE line, not a line return. Merge only same-line fragments;
+    // retain separate rectangles for genuinely wrapped words.
+    const lines: DOMRect[] = [];
+    for (const rect of rects) {
+      const previous = lines.at(-1);
+      if (previous && Math.abs(previous.top - rect.top) < 4) {
+        const left = Math.min(previous.left, rect.left), top = Math.min(previous.top, rect.top);
+        lines[lines.length - 1] = new DOMRect(left, top, Math.max(previous.right, rect.right) - left, Math.max(previous.bottom, rect.bottom) - top);
+      } else lines.push(rect);
+    }
+    rects = lines;
+    const sameLine = this.visible && this.lastRects.length === 1 && rects.length === 1 && Math.abs(this.lastRects[0].top - rects[0].top) < 4;
+    const ms = sameLine ? duration : 0;
+    const transition = ms ? `transform ${ms}ms cubic-bezier(.22,.7,.24,1),width ${ms}ms cubic-bezier(.22,.7,.24,1),height ${ms}ms cubic-bezier(.22,.7,.24,1)` : 'none';
+    if (this.settings.mode === 'cursor') {
+      if (this.fragments.childElementCount) this.fragments.replaceChildren();
+      const r = rects[0], size = this.settings.cursorSize;
+      // Anchor the hand's fingertip, arrow tip, or dot's upper edge under the word.
+      const anchor = this.settings.cursorShape === 'hand' ? .394 : this.settings.cursorShape === 'arrow' ? 7 / 32 : .5;
+      const top = this.settings.cursorShape === 'dot' ? 7 / 32 : this.settings.cursorShape === 'arrow' ? 3 / 32 : 2 / 32;
+      this.marker.style.display = 'block';
+      this.marker.style.transition = transition;
+      this.marker.style.transform = `translate3d(${r.left + r.width / 2 - size * anchor}px,${r.bottom + 3 - size * top}px,0)`;
+    } else {
+      this.marker.style.display = 'none';
+      while (this.fragments.childElementCount > rects.length) this.fragments.lastElementChild!.remove();
+      rects.forEach((r, i) => {
+        const el = (this.fragments.children[i] ?? this.fragments.appendChild(document.createElement('div'))) as HTMLElement;
+        el.className = `fragment ${this.settings.mode === 'outline' ? 'outline' : ''}`;
+        el.style.transition = transition;
+        el.style.transform = `translate3d(${r.left - 2}px,${r.top - 1}px,0)`;
+        el.style.width = `${r.width + 4}px`;
+        el.style.height = `${r.height + 2}px`;
+      });
+    }
+    this.visible = true; this.lastRects = rects;
+  }
+
+  freeze() {
+    // Read the rendered positions before any writes; resume starts here, not at
+    // the previous word or at the CSS transition's unfinished destination.
+    const elements = [this.marker, ...this.fragments.children] as HTMLElement[];
+    const states = elements.map(el => { const css = getComputedStyle(el); return { transform: css.transform, width: css.width, height: css.height }; });
+    elements.forEach((el, i) => { el.style.transition = 'none'; Object.assign(el.style, states[i]); });
+  }
+
+  hide() {
+    this.marker.style.display = 'none'; this.marker.style.transition = 'none';
+    this.fragments.replaceChildren(); this.visible = false; this.lastRects = [];
+  }
+}

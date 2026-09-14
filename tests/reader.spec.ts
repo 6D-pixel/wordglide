@@ -28,8 +28,8 @@ test.beforeAll(async () => {
 });
 test.afterAll(async () => { await context?.close(); server?.close(); if (folder) await rm(folder, { recursive: true, force: true }); });
 
-async function open() {
-  await worker.evaluate(async () => { await chrome.storage.local.clear(); });
+async function open(options: { intro?: boolean } = {}) {
+  await worker.evaluate(async intro => { await chrome.storage.local.clear(); if (!intro) await chrome.storage.local.set({ onboardingSeen: true }); }, options.intro ?? false);
   const page = await context.newPage(); await page.goto(base); await page.bringToFront();
   // Fresh page is last matching tab when several tests have run.
   const tabId = await worker.evaluate(async url => {
@@ -245,4 +245,108 @@ test('popup controls route through the worker to the article and persist setting
   const initial = (await command(tabId, { type: 'snapshot' })).index;
   await expect.poll(async () => (await command(tabId, { type: 'snapshot' })).index).toBeGreaterThan(initial);
   await page.close();
+});
+
+for (const mode of ['cursor', 'highlight', 'outline']) {
+  test(`${mode} moves through intermediate positions on the same line`, async () => {
+    const { page, tabId } = await open();
+    await command(tabId, { type: 'pick-start' });
+    const first = await point(page, '#first', 'Start'); await page.mouse.click(first.x, first.y);
+    await command(tabId, { type: 'pick-end' });
+    const last = await point(page, '#first', 'with'); await page.mouse.click(last.x, last.y);
+    await command(tabId, { type: 'settings', settings: { mode, wpm: 120, natural: false } });
+    const selector = mode === 'cursor' ? '.marker' : '.fragment';
+    const samples = page.evaluate(async selector => {
+      const shadow = document.querySelector('[data-wordglide]')!.shadowRoot!;
+      const points: number[] = []; const began = performance.now();
+      while (performance.now() - began < 1650) {
+        await new Promise(requestAnimationFrame);
+        const el = shadow.querySelector(selector)!;
+        points.push(new DOMMatrixReadOnly(getComputedStyle(el).transform).m41);
+      }
+      return points;
+    }, selector);
+    await command(tabId, { type: 'play' });
+    const points = await samples;
+    const movements = points.slice(1).map((x, i) => x - points[i]);
+    // Two transitions must contain several distinct frames, not two teleports.
+    expect(movements.filter(dx => dx > .1).length).toBeGreaterThan(6);
+    expect(Math.min(...movements)).toBeGreaterThan(-.1);
+    expect((await command(tabId, { type: 'snapshot' })).status).toBe('finished');
+    await page.close();
+  });
+}
+
+test('pause freezes an in-flight transition and resume never rewinds it', async () => {
+  const { page, tabId } = await open();
+  await command(tabId, { type: 'pick-start' });
+  const first = await point(page, '#first', 'Start'); await page.mouse.click(first.x, first.y);
+  await command(tabId, { type: 'settings', settings: { wpm: 120, natural: false } });
+  await command(tabId, { type: 'play' });
+  await page.waitForFunction(() => document.querySelector('[data-wordglide]')!.shadowRoot!.querySelector('.word')!.textContent === 'reading');
+  await command(tabId, { type: 'pause' });
+  const x = () => page.locator('.marker').evaluate(el => new DOMMatrixReadOnly(getComputedStyle(el).transform).m41);
+  const frozen = await x(); await page.waitForTimeout(160); expect(await x()).toBeCloseTo(frozen, 1);
+  await command(tabId, { type: 'play' });
+  expect(await x()).toBeGreaterThanOrEqual(frozen - .1);
+  await page.close();
+});
+
+test('cursor shape, size and thickness controls persist independently of WPM', async () => {
+  const { page, tabId } = await open();
+  await expect(page.locator('.marker')).toHaveAttribute('data-shape', 'hand');
+  await page.locator('[data-shape="dot"]').filter({ has: page.locator('span') }).click();
+  await page.getByRole('slider', { name: 'Cursor size', exact: true }).fill('36');
+  let state = await command(tabId, { type: 'snapshot' });
+  expect(state.settings).toMatchObject({ cursorShape: 'dot', cursorSize: 36, wpm: 250 });
+  await expect(page.locator('.marker')).toHaveCSS('width', '36px');
+  await expect(page.locator('.marker svg circle')).toHaveCount(1);
+  await page.locator('button[data-shape="hand"]').click();
+  await page.getByRole('slider', { name: 'Stroke thickness', exact: true }).fill('3.5');
+  await expect(page.locator('.marker svg')).toHaveCSS('stroke-width', '3.5px');
+  state = await command(tabId, { type: 'snapshot' }); expect(state.settings.wpm).toBe(250);
+  await command(tabId, { type: 'dispose' });
+  await worker.evaluate(async id => { await chrome.scripting.executeScript({ target: { tabId: id }, files: ['content.js'] }); }, tabId);
+  const restored = await command(tabId, { type: 'snapshot' });
+  expect(restored.settings).toMatchObject({ cursorShape: 'hand', cursorSize: 36, thickness: 3.5 });
+  await page.screenshot({ path: 'test-results/appearance.png' });
+  await page.close();
+});
+
+test('first-use introduction can be dismissed, reopened, and stays dismissed on reload', async () => {
+  const { page, tabId } = await open({ intro: true });
+  await expect(page.getByRole('region', { name: 'Welcome to WordGlide' })).toBeVisible();
+  await expect(page.locator('.intro-start')).toHaveText('Choose my start word');
+  await page.screenshot({ path: 'test-results/welcome.png' });
+  await page.locator('.intro-dismiss').click();
+  await expect(page.locator('.welcome')).toBeHidden();
+  await command(tabId, { type: 'play' });
+  await expect(page.locator('[data-command="play"]')).toHaveText('Ⅱ Pause reading');
+  await command(tabId, { type: 'pause' });
+  await expect(page.locator('[data-command="play"]')).toHaveText('▶ Resume reading');
+  await page.getByRole('button', { name: 'Expand reading controls' }).click();
+  await page.getByRole('button', { name: 'How to use WordGlide' }).click();
+  await expect(page.locator('.welcome')).toBeVisible();
+  await page.locator('.intro-start').click();
+  await expect.poll(async () => (await command(tabId, { type: 'snapshot' })).status).toBe('picking-start');
+  await command(tabId, { type: 'dispose' });
+  await worker.evaluate(async id => { await chrome.scripting.executeScript({ target: { tabId: id }, files: ['content.js'] }); }, tabId);
+  await expect(page.locator('.reader-controls')).toBeVisible();
+  await expect(page.locator('.welcome')).toBeHidden();
+  await page.close();
+});
+
+test('popup introduction does not require page access and migrates existing preferences', async () => {
+  await worker.evaluate(async () => { await chrome.storage.local.clear(); await chrome.storage.local.set({ settings: { wpm: 320, mode: 'cursor', natural: false, autoScroll: true } }); });
+  const popup = await context.newPage();
+  await popup.goto(`chrome-extension://${new URL(worker.url()).host}/popup.html`);
+  await expect(popup.locator('.welcome')).toBeVisible();
+  await expect(popup.locator('.intro-start')).toHaveText('Choose my start word');
+  await popup.locator('body').screenshot({ path: 'test-results/welcome-popup.png' });
+  await popup.locator('.intro-dismiss').click();
+  await expect(popup.getByRole('spinbutton', { name: 'Words per minute' })).toHaveValue('320');
+  await expect(popup.locator('button[data-shape="hand"]')).toHaveAttribute('aria-pressed', 'true');
+  await popup.reload();
+  await expect(popup.locator('.welcome')).toBeHidden();
+  await popup.close();
 });

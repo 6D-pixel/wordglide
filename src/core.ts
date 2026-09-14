@@ -1,6 +1,7 @@
 export type Mode = 'cursor' | 'highlight' | 'outline';
-export type Settings = { wpm: number; mode: Mode; natural: boolean; autoScroll: boolean };
-export const defaults: Settings = { wpm: 250, mode: 'cursor', natural: true, autoScroll: true };
+export type CursorShape = 'hand' | 'dot' | 'arrow';
+export type Settings = { wpm: number; mode: Mode; natural: boolean; autoScroll: boolean; cursorShape: CursorShape; cursorSize: number; thickness: number };
+export const defaults: Settings = { wpm: 250, mode: 'cursor', natural: true, autoScroll: true, cursorShape: 'hand', cursorSize: 24, thickness: 2 };
 export type Segment = { text: string; start: number; end: number; punctuation: string };
 
 export function sanitizeSettings(value: Partial<Settings> = {}): Settings {
@@ -9,6 +10,9 @@ export function sanitizeSettings(value: Partial<Settings> = {}): Settings {
     mode: ['cursor', 'highlight', 'outline'].includes(value.mode ?? '') ? value.mode! : defaults.mode,
     natural: typeof value.natural === 'boolean' ? value.natural : defaults.natural,
     autoScroll: typeof value.autoScroll === 'boolean' ? value.autoScroll : defaults.autoScroll,
+    cursorShape: ['hand', 'dot', 'arrow'].includes(value.cursorShape ?? '') ? value.cursorShape! : defaults.cursorShape,
+    cursorSize: typeof value.cursorSize === 'number' && Number.isFinite(value.cursorSize) ? Math.max(12, Math.min(40, Math.round(value.cursorSize))) : defaults.cursorSize,
+    thickness: typeof value.thickness === 'number' && Number.isFinite(value.thickness) ? Math.max(1, Math.min(4, Math.round(value.thickness * 2) / 2)) : defaults.thickness,
   };
 }
 
@@ -37,7 +41,9 @@ export function durationFor(token: Segment, paragraphEnd: boolean, settings: Set
 }
 
 export function travelDuration(duration: number, newLine: boolean): number {
-  return Math.min(newLine ? 60 : 80, duration * (newLine ? .25 : .35));
+  // Match the reference's follow-along rhythm: ease into the word, then dwell.
+  // A line return must not draw a diagonal trail through other words.
+  return newLine ? 0 : Math.min(130, duration * .3);
 }
 
 export type Status = 'idle' | 'ready' | 'playing' | 'paused' | 'picking-start' | 'picking-end' | 'picking-area' | 'finished';

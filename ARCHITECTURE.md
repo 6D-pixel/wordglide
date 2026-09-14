@@ -12,7 +12,7 @@ The page runtime mounts one fixed overlay host under `documentElement`, with sty
 
 `text.ts` detects a rendered GitHub README or scores semantic article containers. A manual container picker is the fallback. It walks eligible text nodes, groups contiguous inline content into blocks, and maps a flat string back to original text-node offsets. Word segmentation runs on each flat block, preserving words split across emphasis and links. `<br>` and `<hr>` break blocks.
 
-Each word retains its original DOM `Range`. Per-word client rectangles support fragments spanning multiple lines. The cursor targets the first fragment; highlighting and outlining draw every fragment. Click-to-word mapping uses the caret API and checks the measured text bounds.
+Each word retains its original DOM `Range`. `guide.ts` merges same-line fragments caused by inline formatting before animating, while preserving fragments on separate lines. The cursor targets the first visual line; highlighting and outlining draw every visual line. Click-to-word mapping uses the caret API and checks the measured text bounds.
 
 Geometry is cached for the current word and cleared on scrolling, resizing, font/image loads, and relevant page changes. The engine reads geometry before drawing the overlay. Text edits rebuild the index and preserve selected boundaries only when their node offsets and text still match; playback pauses for review.
 
@@ -20,7 +20,9 @@ Geometry is cached for the current word and cleared on scrolling, resizing, font
 
 One animation-frame loop uses a monotonic clock. Base duration is `60000 / WPM`; natural pacing applies the largest punctuation or paragraph multiplier (1.25, 1.5, or 1.8). Common abbreviations avoid sentence pauses. Strict mode uses an equal duration per word.
 
-Cursor travel occupies at most 35% of the word budget / 80ms on the same line, or 25% / 60ms on a line return. Remaining time is dwell. Reduced-motion mode removes travel. Long main-thread stalls extend the schedule rather than skipping unseen words. Pause preserves progress within the current word; stop resets to the selected start; finish retains the final word.
+`guide.ts` keeps persistent elements and applies browser-managed transform/size transitions once per word. Same-line travel uses the reference reader's follow-along timing: `min(130ms, duration * 0.3)` with `cubic-bezier(.22,.7,.24,1)`. Line returns and genuinely wrapped words reposition without a diagonal animation. The frame loop advances the word clock and only repositions an active guide when layout changes; it does not overwrite the transition every frame. Reduced-motion mode removes travel. Long main-thread stalls extend the schedule rather than skipping unseen words. Pause freezes computed visual coordinates and preserves progress within the word; stop resets to the selected start; finish retains the final word.
+
+Cursor shape (hand/dot/arrow), size (12–40), and stroke thickness (1–4) are sanitized with defaults when older preferences are loaded. SVG viewBoxes preserve shape proportions. The shared controls show a one-time introduction, synchronize its dismissal through local storage, and expose a help button to reopen it without resetting reading preferences.
 
 Before advancing onto a word outside the reading band, the engine temporarily suspends advancement and scrolls the document or nearest vertical scrolling ancestor. A 220ms owned scroll trajectory moves the target near 40% of the visible reading region. Edge sticky/fixed headers are considered when measuring that region. At the end of a document, fully visible words remain readable even if recentering is impossible.
 
@@ -28,6 +30,6 @@ Owned scroll position and a short final-event tolerance distinguish extension sc
 
 ## Verification and boundaries
 
-Unit tests cover segmentation, offsets, setting normalization, natural timing, and travel limits. Browser tests load the extension in an isolated Playwright Chromium profile with a fixture-only host grant; production permissions are unchanged. Tests cover actual content messaging, selection, modes, scrolling, mutation handling, reinjection, and UI screenshots.
+Unit tests cover segmentation, offsets, preference migration, natural timing, and travel limits. Browser tests load the extension in an isolated Playwright Chromium profile with a fixture-only host grant; production permissions are unchanged. Tests cover actual content messaging, selection, modes, scrolling, mutation handling, reinjection, appearance settings, introductory guidance, and UI screenshots. Motion tests sample computed positions over multiple frames to distinguish real interpolation from word-to-word jumps, including words split by inline formatting.
 
 V1 is local-only and optimized for left-to-right prose. Reading-order heuristics, page overlays, animated content, and arbitrary site DOM conventions remain compatibility boundaries. The extension does not manipulate the native OS cursor or promise medical/educational outcomes.

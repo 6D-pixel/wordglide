@@ -14,12 +14,16 @@ The ready-to-load extension is in `dist/` after building.
 
 After rebuilding, click **Reload** on the extension card. Reload an already-open article if its old controls are still present; reactivating the extension also removes the old overlay.
 
+On first opening, a short walkthrough explains how to choose a word, set your pace, and use the controls. Click **?** beside WordGlide to read it again. Your existing speed preferences are preserved when updating.
+
 ## Read a passage
 
 - **Start reading** reads the detected article from its beginning. Selecting text before activating uses that selection as the passage when it belongs to the detected article.
 - **Set start word** lets you click any eligible word. **Set end word** chooses the inclusive final word. Without an explicit end, reading continues to the end of the article.
 - **Choose a different reading area** highlights the prose container under your mouse; click to choose it, then select your first word.
 - Choose **Cursor**, **Highlight**, or **Outline**. This is a visual guide; your real mouse remains available.
+- In Cursor mode, choose a **Hand** (default), **Dot**, or **Arrow**. Adjust **Size** from 12–40 px. **Stroke thickness** adjusts the hand/arrow or word outline; the dot uses the size control.
+- All three modes ease smoothly between words on the same line. Line returns jump directly to the next line so the guide does not sweep diagonally across the paragraph. System reduced-motion preferences disable the animation.
 - Adjust speed between **60 and 1,000 WPM**. Natural pauses add time at punctuation and paragraph ends. Scrolling and browser slowdowns can extend elapsed reading time; words are never deliberately skipped to catch up.
 - The floating toolbar collapses during playback. Click its handle to pause and expand it. Drag the dotted top bar to move it.
 - **Pause** saves your place. **Stop** returns to the selected start. **×** removes the guide and ends the session.
@@ -59,4 +63,4 @@ Browser tests load a temporary extension copy with host permission **only for th
 
 ## Privacy
 
-The extension runs locally on pages where you activate it. It requests temporary access to the current tab, script injection, and local preference storage. It stores speed, guide mode, pause/scroll preferences, and toolbar position. It does not send article text to a server, record reading history, or use analytics.
+The extension runs locally on pages where you activate it. It requests temporary access to the current tab, script injection, and local preference storage. It stores speed, guide mode, cursor appearance, pause/scroll preferences, toolbar position, and whether you dismissed the introduction. It does not send article text to a server, record reading history, or use analytics.

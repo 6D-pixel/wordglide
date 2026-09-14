@@ -34,3 +34,16 @@ test('travel always fits word budget at supported speed boundaries', () => {
     for (const line of [true, false]) assert.ok(travelDuration(duration, line) < duration);
   }
 });
+test('older preferences acquire cursor defaults without losing pace', () => {
+  const result = sanitizeSettings({ wpm: 340, mode: 'outline', natural: false });
+  assert.equal(result.wpm, 340); assert.equal(result.mode, 'outline');
+  assert.equal(result.cursorShape, 'hand'); assert.equal(result.cursorSize, 24); assert.equal(result.thickness, 2);
+  assert.equal(sanitizeSettings({ cursorSize: 999, thickness: -5 }).cursorSize, 40);
+  assert.equal(sanitizeSettings({ thickness: -5 }).thickness, 1);
+  assert.equal(sanitizeSettings({ cursorSize: NaN, thickness: Infinity }).cursorSize, 24);
+});
+test('same-line easing has room to settle, while line returns are immediate', () => {
+  assert.equal(travelDuration(500, false), 130);
+  assert.equal(travelDuration(240, false), 72);
+  assert.equal(travelDuration(240, true), 0);
+});

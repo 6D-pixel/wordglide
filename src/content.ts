@@ -2,6 +2,7 @@ import css from '../styles.css';
 import { defaults, sanitizeSettings, durationFor, travelDuration, type Settings, type Status, type Command, type Snapshot, type Reply } from './core.ts';
 import { detectRoot, indexRoot, rectangles, tokenAtPoint, readable, type Token } from './text.ts';
 import { mountControls } from './ui.ts';
+import { Guide, guideCSS } from './guide.ts';
 
 type Runtime = { build: string; dispose: () => void; reveal: () => void };
 const context = globalThis as typeof globalThis & { __wordglide?: Runtime };
@@ -27,9 +28,7 @@ async function initialize() {
   let epoch = 0;
   let elapsed = 0, began = 0, wordDuration = 0, lastFrame = 0;
   let rectCache = new Map<number, DOMRect[]>();
-  let priorRect: DOMRect | undefined;
   let geometryDirty = true;
-  let transitionStart = 0;
   let pickingPreview: Token | HTMLElement | undefined;
   let lastBroadcast = 0;
   let rebuildTimer = 0;
@@ -54,22 +53,18 @@ async function initialize() {
     :host{all:initial} .shell{font:14px/1.45 Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;text-align:left;letter-spacing:normal;color:#233b36;position:fixed;right:20px;bottom:20px;width:326px;max-width:calc(100vw - 24px);max-height:calc(100vh - 24px);overflow:auto;pointer-events:auto;border:1px solid #d4ddcb;border-radius:18px;box-shadow:0 12px 50px #102a2429;background:#f8f7f2;scrollbar-width:thin}
     .shell .panel{padding:18px}.shell .reading{margin-top:14px}.shell h1{font-size:25px}.shell .toggles{margin-top:8px}.shell .section-label{margin-top:13px}.chrome{display:flex;align-items:center;gap:5px;padding:7px 10px;border-bottom:1px solid #e3e7da;background:#edf0e6;position:sticky;top:0;z-index:2}.drag{flex:1;color:#7e8c73;letter-spacing:2px;font-size:12px;cursor:grab;touch-action:none;background:transparent;text-align:left}.chrome button:not(.drag){width:26px;height:26px;border-radius:6px;background:transparent;color:#5c7054}.chrome button:hover{background:#dce5d2}
     .handle{display:none;pointer-events:auto;background:#294e3e;color:#fffdf4;border-radius:28px;padding:11px 16px;box-shadow:0 5px 25px #19352b30;font-size:12px;white-space:nowrap}.shell.collapsed{width:auto;overflow:visible;background:none;border:0;box-shadow:none}.collapsed .chrome,.collapsed .panel{display:none}.collapsed .handle{display:block}
-    .guide{position:fixed;pointer-events:none;will-change:transform;top:0;left:0;display:none}.marker{width:16px;height:16px;filter:drop-shadow(0 1px 1px #fff);color:#386c46}.marker svg{width:16px;height:16px;display:block}.fragment{position:fixed;border-radius:4px;pointer-events:none;box-sizing:border-box;background:#edc96155}.fragment.outline{background:transparent;border:2px solid #5d8150}.preview{position:fixed;pointer-events:none;border:2px dashed #68875b;border-radius:5px;background:#78945315;display:none}.hint{position:fixed;left:50%;top:16px;transform:translateX(-50%);max-width:calc(100vw - 30px);padding:11px 18px;background:#294e3e;color:#fff;border-radius:10px;font:13px/1.5 system-ui;box-shadow:0 4px 20px #0002;display:none;text-align:center;pointer-events:none}
+    ${guideCSS}
+    .preview{position:fixed;pointer-events:none;border:2px dashed #68875b;border-radius:5px;background:#78945315;display:none}.hint{position:fixed;left:50%;top:16px;transform:translateX(-50%);max-width:calc(100vw - 30px);padding:11px 18px;background:#294e3e;color:#fff;border-radius:10px;font:13px/1.5 system-ui;box-shadow:0 4px 20px #0002;display:none;text-align:center;pointer-events:none}
   `;
   shadow.append(style);
-  const marker = document.createElement('div');
-  marker.className = 'guide marker';
-  marker.setAttribute('aria-hidden', 'true');
-  marker.innerHTML = '<svg viewBox="0 0 20 20" fill="none"><path d="M9 1 2 16l6-3 4 5 3-2-4-5 6-1Z" fill="currentColor" stroke="#fffdf5" stroke-width="1.4" stroke-linejoin="round"/></svg>';
-  const fragments = document.createElement('div');
-  fragments.setAttribute('aria-hidden', 'true');
+  const guide = new Guide(shadow);
   const preview = document.createElement('div'); preview.className = 'preview';
   const hint = document.createElement('div'); hint.className = 'hint'; hint.setAttribute('role', 'status');
   const shell = document.createElement('section'); shell.className = 'shell'; shell.setAttribute('aria-label', 'WordGlide controls');
   shell.innerHTML = '<div class="chrome"><button class="drag" aria-label="Move reading controls">⠿ READING COMPANION</button><button class="collapse" aria-label="Collapse controls">−</button><button class="close" aria-label="Close reading guide">×</button></div><div class="panel"></div><button class="handle" aria-label="Expand reading controls">↗ WordGlide</button>';
-  shadow.append(marker, fragments, preview, hint, shell);
+  shadow.append(preview, hint, shell);
   document.documentElement.append(host);
-  const renderUI = mountControls(shell.querySelector('.panel')!, command => { try { dispatch(command); } catch (error) { message = String(error); publish(); } });
+  const renderUI = mountControls(shell.querySelector('.panel')!, command => { try { dispatch(command); } catch (error) { message = String(error); publish(); } }, () => pause('Paused while you read the quick guide.'));
 
   function snapshot(): Snapshot {
     return { status, settings, index, start, end, count: tokens.length, word: tokens[index]?.text ?? '', message, title: root?.querySelector('h1,h2')?.textContent?.trim().slice(0, 100) ?? document.title };
@@ -92,26 +87,10 @@ async function initialize() {
     if (!rectCache.has(token.id)) rectCache.set(token.id, rectangles(token));
     return rectCache.get(token.id)!;
   }
-  function hideGuide() { marker.style.display = 'none'; fragments.replaceChildren(); }
-  function paint(list: DOMRect[], x?: number, y?: number) {
-    if (!list.length) { hideGuide(); return; }
-    if (settings.mode === 'cursor') {
-      fragments.replaceChildren(); marker.style.display = 'block';
-      const r = list[0];
-      marker.style.transform = `translate3d(${(x ?? r.left + r.width / 2) - 7}px,${y ?? r.bottom + 2}px,0)`;
-    } else {
-      marker.style.display = 'none';
-      while (fragments.childElementCount > list.length) fragments.lastElementChild!.remove();
-      list.forEach((r, i) => {
-        const el = (fragments.children[i] ?? fragments.appendChild(document.createElement('div'))) as HTMLElement;
-        el.className = `fragment ${settings.mode === 'outline' ? 'outline' : ''}`;
-        el.style.cssText = `left:${r.left - 2}px;top:${r.top - 1}px;width:${r.width + 4}px;height:${r.height + 2}px`;
-      });
-    }
-  }
+  function hideGuide() { guide.hide(); }
   function drawStatic() {
     if (disposed || status.startsWith('picking') || !tokens[index]) return;
-    paint(rects(tokens[index]));
+    guide.move(rects(tokens[index]));
   }
   function chooseRoot(next: HTMLElement, useSelection = false) {
     pause(); root = next; tokens = indexRoot(next); geometryRecovery.clear(); index = start = 0; end = Math.max(0, tokens.length - 1);
@@ -121,10 +100,11 @@ async function initialize() {
     }
     status = tokens.length ? 'ready' : 'idle';
     message = tokens.length ? 'Passage ready. Set your boundaries or press Play.' : 'No readable prose here. Choose a different reading area.';
-    elapsed = 0; priorRect = undefined; invalidate(); observeRoot(); publish();
+    elapsed = 0; invalidate(); observeRoot(); publish();
   }
   function pause(reason = '') {
     epoch++;
+    if (status === 'playing') guide.freeze();
     if (status === 'playing' && !scrollTask) elapsed += Math.max(0, performance.now() - began);
     cancelAnimationFrame(raf); scrollTask = undefined;
     if (!status.startsWith('picking') && tokens.length && status !== 'finished') status = 'paused';
@@ -205,7 +185,7 @@ async function initialize() {
     lastOwnedScroll = { scroller: task.scroller, position: task.expected, at: now };
     rectCache.clear(); geometryDirty = true; drawStatic();
     if (progress < 1) raf = requestAnimationFrame(animateScroll);
-    else { scrollTask = undefined; elapsed = 0; priorRect = undefined; task.done(); }
+    else { scrollTask = undefined; elapsed = 0; task.done(); }
   }
   function beginWord() {
     if (disposed || status !== 'playing') return;
@@ -217,7 +197,8 @@ async function initialize() {
     if (!list.length) { pause('This word has no visible position. Scroll it into view and resume.'); return; }
     avoidToolbar(list);
     wordDuration = durationFor(token, token.paragraphEnd, settings);
-    began = performance.now(); lastFrame = began; transitionStart = began;
+    began = performance.now(); lastFrame = began;
+    guide.move(list, reduced.matches ? 0 : Math.min(travelDuration(wordDuration, false), Math.max(0, wordDuration - elapsed)));
     publish(false); raf = requestAnimationFrame(frame);
   }
   function frame(now: number) {
@@ -229,17 +210,14 @@ async function initialize() {
     // After a blocked main thread, preserve the unseen portion instead of catching up.
     if (now - lastFrame > 100) began += now - lastFrame;
     lastFrame = now;
-    if (geometryDirty) { rectCache.clear(); geometryDirty = false; priorRect = undefined; }
+    const needsLayout = geometryDirty;
+    if (geometryDirty) { rectCache.clear(); geometryDirty = false; }
     const list = rects(tokens[index]);
     if (!list.length) { pause('The current word is not visible. Scroll to it and resume.'); return; }
-    const r = list[0];
-    const travel = travelDuration(wordDuration, !!priorRect && Math.abs(priorRect.top - r.top) > r.height * .5);
-    const p = reduced.matches || !priorRect ? 1 : Math.min(1, (now - transitionStart) / travel);
-    const eased = p * p * (3 - 2 * p);
-    paint(list, priorRect ? priorRect.left + priorRect.width / 2 + (r.left + r.width / 2 - priorRect.left - priorRect.width / 2) * eased : undefined, priorRect ? priorRect.bottom + 2 + (r.bottom - priorRect.bottom) * eased : undefined);
+    if (needsLayout) guide.move(list);
     if (elapsed + now - began >= wordDuration) {
       if (index >= end) { status = 'finished'; elapsed = 0; message = 'Passage complete. Take a breath, or read it again.'; publish(); return; }
-      priorRect = r; index++; elapsed = 0; scrollAttempts = 0; beginWord();
+      index++; elapsed = 0; scrollAttempts = 0; beginWord();
     } else raf = requestAnimationFrame(frame);
   }
   function play() {
@@ -271,7 +249,13 @@ async function initialize() {
       case 'pick-end': if (!tokens.length) { message = 'Choose a start word first.'; } else pick('picking-end'); break;
       case 'pick-area': pick('picking-area'); break;
       case 'step': pause(); leavePicking(); index = Math.max(start, Math.min(end, index + Math.sign(command.delta ?? 1))); elapsed = 0; drawStatic(); break;
-      case 'settings': settings = sanitizeSettings({ ...settings, ...command.settings }); void chrome.storage.local.set({ settings }).catch(() => {}); drawStatic(); break;
+      case 'settings': {
+        const previous = settings;
+        settings = sanitizeSettings({ ...settings, ...command.settings });
+        void chrome.storage.local.set({ settings }).catch(() => {});
+        if (settings.mode !== previous.mode || settings.cursorShape !== previous.cursorShape || settings.cursorSize !== previous.cursorSize || settings.thickness !== previous.thickness) { guide.configure(settings); drawStatic(); }
+        break;
+      }
       case 'dispose': dispose(); break;
     }
     publish(); return snapshot();
@@ -295,6 +279,7 @@ async function initialize() {
     if (disposed) return;
     disposed = true; epoch++; cancelAnimationFrame(raf); clearTimeout(rebuildTimer); abort.abort();
     observer.disconnect(); navigationObserver.disconnect(); resizeObserver.disconnect();
+    renderUI.dispose();
     try { chrome.runtime.onMessage.removeListener(listener); } catch { /* An extension update may have invalidated this context. */ }
     host.remove();
     if (context.__wordglide?.build === __BUILD_ID__) delete context.__wordglide;
@@ -383,6 +368,7 @@ async function initialize() {
   on(document, 'keydown', event => {
     const e = event as KeyboardEvent;
     const target = e.composedPath()[0] as Element;
+    if (renderUI.isIntroOpen()) return;
     if (target instanceof Element && target.closest('input,textarea,select,[contenteditable]:not([contenteditable="false"])')) return;
     if (e.key === 'Escape') { e.preventDefault(); pause(); leavePicking(); message = 'Paused. Press Space to resume.'; publish(); }
     else if (e.code === 'Space' && !e.altKey && !e.ctrlKey && !e.metaKey) { e.preventDefault(); if (status === 'playing') pause('Paused. Press Space to resume.'); else play(); }
@@ -401,6 +387,7 @@ async function initialize() {
     const stored = await chrome.storage.local.get(['settings', 'toolbarPosition']) as { settings?: Partial<Settings>; toolbarPosition?: { x: number; y: number } };
     if (disposed) return;
     settings = sanitizeSettings(stored.settings);
+    guide.configure(settings);
     if (Number.isFinite(stored.toolbarPosition?.x) && Number.isFinite(stored.toolbarPosition?.y)) savedPosition = stored.toolbarPosition;
   } catch { /* Defaults remain available if storage is unavailable. */ }
   const detected = detectRoot();
