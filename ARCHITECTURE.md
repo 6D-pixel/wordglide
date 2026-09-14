@@ -1,0 +1,33 @@
+# Architecture
+
+## Runtime ownership
+
+`background.ts` handles user-triggered activation and injects `content.js` using `activeTab` and `scripting`. The service worker owns no reading state. The popup uses typed commands and requests a fresh snapshot when opened. Each tab's content runtime owns its own session and effective preferences; saved preference changes become defaults for future sessions.
+
+`ui.ts` provides the same controls to the popup and floating toolbar. The popup is disposable: closing it leaves playback intact. Content snapshots update it without persisting a word index for every animation frame.
+
+The page runtime mounts one fixed overlay host under `documentElement`, with styles inside a shadow root. Visual guide elements ignore pointer events. Only controls accept input. No website words are wrapped or replaced. A build ID and a DOM teardown event let a new injection remove stale controls from an older extension context.
+
+## Text and geometry
+
+`text.ts` detects a rendered GitHub README or scores semantic article containers. A manual container picker is the fallback. It walks eligible text nodes, groups contiguous inline content into blocks, and maps a flat string back to original text-node offsets. Word segmentation runs on each flat block, preserving words split across emphasis and links. `<br>` and `<hr>` break blocks.
+
+Each word retains its original DOM `Range`. Per-word client rectangles support fragments spanning multiple lines. The cursor targets the first fragment; highlighting and outlining draw every fragment. Click-to-word mapping uses the caret API and checks the measured text bounds.
+
+Geometry is cached for the current word and cleared on scrolling, resizing, font/image loads, and relevant page changes. The engine reads geometry before drawing the overlay. Text edits rebuild the index and preserve selected boundaries only when their node offsets and text still match; playback pauses for review.
+
+## Playback and scrolling
+
+One animation-frame loop uses a monotonic clock. Base duration is `60000 / WPM`; natural pacing applies the largest punctuation or paragraph multiplier (1.25, 1.5, or 1.8). Common abbreviations avoid sentence pauses. Strict mode uses an equal duration per word.
+
+Cursor travel occupies at most 35% of the word budget / 80ms on the same line, or 25% / 60ms on a line return. Remaining time is dwell. Reduced-motion mode removes travel. Long main-thread stalls extend the schedule rather than skipping unseen words. Pause preserves progress within the current word; stop resets to the selected start; finish retains the final word.
+
+Before advancing onto a word outside the reading band, the engine temporarily suspends advancement and scrolls the document or nearest vertical scrolling ancestor. A 220ms owned scroll trajectory moves the target near 40% of the visible reading region. Edge sticky/fixed headers are considered when measuring that region. At the end of a document, fully visible words remain readable even if recentering is impossible.
+
+Owned scroll position and a short final-event tolerance distinguish extension scrolling from unexplained page movement. Wheel, touch, pointer interaction, and scrolling keys pause immediately. The guide never resumes automatically after a user interruption. Missing geometry pauses with a recovery message instead of guessing a word location.
+
+## Verification and boundaries
+
+Unit tests cover segmentation, offsets, setting normalization, natural timing, and travel limits. Browser tests load the extension in an isolated Playwright Chromium profile with a fixture-only host grant; production permissions are unchanged. Tests cover actual content messaging, selection, modes, scrolling, mutation handling, reinjection, and UI screenshots.
+
+V1 is local-only and optimized for left-to-right prose. Reading-order heuristics, page overlays, animated content, and arbitrary site DOM conventions remain compatibility boundaries. The extension does not manipulate the native OS cursor or promise medical/educational outcomes.
