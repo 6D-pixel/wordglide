@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "WordGlide — reading guide",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Find your reading rhythm. A gentle word-by-word guide for articles and GitHub READMEs.",
   "minimum_chrome_version": "120",
   "permissions": ["activeTab", "scripting", "storage"],

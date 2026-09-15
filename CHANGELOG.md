@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.1
+
+- Hand and arrow now use the same continuous full-word sweep as the dot.
+- Cursor tips and the dot's visible edge sit one pixel below the text range at every size.
+- Compact 280px controls with shorter labels and no slogans; recovery guidance and the tutorial remain available.
+
 ## 0.3.0
 
 - Continuous leading-edge dot sweep with a short fading trail and clean line returns.

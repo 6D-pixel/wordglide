@@ -125,7 +125,7 @@ test('screenshots of toolbar and popup', async () => {
   await page.screenshot({ path: 'test-results/reader.png' });
   const popup = await context.newPage();
   await popup.goto(`chrome-extension://${new URL(worker.url()).host}/popup.html`);
-  await expect(popup.locator('h1')).toHaveText('Find your rhythm.');
+  await expect(popup.locator('.brand strong')).toHaveText('WordGlide');
   await popup.locator('body').screenshot({ path: 'test-results/popup.png' });
   await popup.close(); await page.close();
 });
@@ -321,9 +321,9 @@ test('first-use introduction can be dismissed, reopened, and stays dismissed on 
   await page.locator('.intro-dismiss').click();
   await expect(page.locator('.welcome')).toBeHidden();
   await command(tabId, { type: 'play' });
-  await expect(page.locator('[data-command="play"]')).toHaveText('Ⅱ Pause reading');
+  await expect(page.locator('[data-command="play"]')).toHaveText('Ⅱ Pause');
   await command(tabId, { type: 'pause' });
-  await expect(page.locator('[data-command="play"]')).toHaveText('▶ Resume reading');
+  await expect(page.locator('[data-command="play"]')).toHaveText('▶ Resume');
   await page.getByRole('button', { name: 'Expand reading controls' }).click();
   await page.getByRole('button', { name: 'How to use WordGlide' }).click();
   await expect(page.locator('.welcome')).toBeVisible();
@@ -470,5 +470,47 @@ test('dot line returns clear old trails without diagonal travel', async () => {
   const changes = points.slice(1).map((p, i) => p.y - points[i].y).filter(d => Math.abs(d) > .1);
   expect(changes.length).toBe(1); expect(changes[0]).toBeGreaterThan(50);
   expect(points.every(p => p.trailY.every(y => Math.abs(y - p.y) < 12))).toBe(true);
+  await page.close();
+});
+
+for (const cursorShape of ['hand', 'arrow']) {
+  test(`${cursorShape} keeps gliding throughout the word and resumes in place`, async () => {
+    const { page, tabId } = await open();
+    await command(tabId, { type: 'pick-start' });
+    const first = await point(page, '#first', 'Start'); await page.mouse.click(first.x, first.y);
+    await command(tabId, { type: 'settings', settings: { cursorShape, wpm: 60, natural: false } });
+    const x = () => page.locator('.marker').evaluate(el => el.getBoundingClientRect().left);
+    await command(tabId, { type: 'play' });
+    await page.waitForTimeout(200); const early = await x();
+    await page.waitForTimeout(250); const middle = await x();
+    await page.waitForTimeout(250); const late = await x();
+    expect(middle).toBeGreaterThan(early + 5); expect(late).toBeGreaterThan(middle + 5);
+    await command(tabId, { type: 'pause' }); const frozen = await x();
+    await page.waitForTimeout(120); expect(await x()).toBeCloseTo(frozen, 1);
+    await command(tabId, { type: 'play' }); expect(await x()).toBeGreaterThanOrEqual(frozen - 1);
+    await expect(page.locator('.trail-dot')).toHaveCount(0);
+    await page.close();
+  });
+}
+
+test('dot edge stays close to text at every size and controls fit a small panel', async () => {
+  const { page, tabId } = await open();
+  await command(tabId, { type: 'pick-start' });
+  const first = await point(page, '#first', 'Start'); await page.mouse.click(first.x, first.y);
+  const bottom = await page.locator('#first').evaluate(el => {
+    const range = document.createRange(); range.setStart(el.firstChild!, 0); range.setEnd(el.firstChild!, 5);
+    return range.getBoundingClientRect().bottom;
+  });
+  for (const cursorSize of [12, 24, 40]) {
+    await command(tabId, { type: 'settings', settings: { cursorShape: 'dot', cursorSize } });
+    const box = (await page.locator('.marker').boundingBox())!;
+    const visibleTop = box.y + cursorSize * 6.25 / 32;
+    expect(visibleTop - bottom).toBeCloseTo(1, 1);
+  }
+  await command(tabId, { type: 'settings', settings: { cursorShape: 'hand', cursorSize: 24 } });
+  const panel = (await page.locator('.shell').boundingBox())!;
+  expect(panel.width).toBeLessThanOrEqual(280); expect(panel.height).toBeLessThan(520);
+  await expect(page.getByRole('button', { name: 'Set end word' })).toBeInViewport();
+  await page.screenshot({ path: 'test-results/compact-controls.png' });
   await page.close();
 });

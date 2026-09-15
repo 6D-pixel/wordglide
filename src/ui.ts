@@ -3,33 +3,27 @@ import { cursorIcon } from './guide.ts';
 import { mountWalkthrough, walkthroughHTML } from './walkthrough.ts';
 
 export const controlsHTML = `
-  <div class="brand"><span class="logo" aria-hidden="true">↗</span><div><strong>WordGlide</strong><span class="eyebrow">A LITTLE GUIDANCE. YOUR OWN PACE.</span></div><button class="help" aria-label="How to use WordGlide" title="How to use WordGlide">?</button></div>
+  <div class="brand"><span class="logo" aria-hidden="true">↗</span><strong>WordGlide</strong><button class="help" aria-label="How to use WordGlide" title="How to use WordGlide">?</button></div>
   <section class="welcome" aria-label="Welcome to WordGlide">
     ${walkthroughHTML}
   </section>
   <div class="reader-controls" hidden>
-  <div class="reading"><span class="status">READY WHEN YOU ARE</span><h1>Find your rhythm.</h1><p class="message" role="status">Choose a word. Follow the flow.</p></div>
+  <div class="reading"><span class="status">READY</span><p class="message" role="status" hidden></p></div>
   <div class="progress-track"><div class="progress-fill"></div></div>
   <div class="progress-meta"><span class="position">No passage selected</span><span class="word"></span></div>
   <div class="transport"><button class="primary" data-command="play">▶ <span>Start reading</span></button><button class="secondary stop" data-command="stop" title="Stop and return to start" aria-label="Stop and return to start">■</button></div>
-  <div class="section-label">READING SPEED <span class="pace-label">BASE PACE</span></div>
-  <div class="speed"><button data-speed="-10" aria-label="Slower">−</button><label><input aria-label="Words per minute" type="number" min="60" max="1000" step="10" value="250"><span>words / min</span></label><button data-speed="10" aria-label="Faster">+</button></div>
+  <div class="speed"><button data-speed="-10" aria-label="Slower">−</button><label><input aria-label="Words per minute" type="number" min="60" max="1000" step="10" value="250"><span>WPM</span></label><button data-speed="10" aria-label="Faster">+</button></div>
   <input class="range" aria-label="Reading speed slider" type="range" min="60" max="1000" step="10" value="250">
-  <div class="range-labels"><span>Take it easy</span><span>Pick up the pace</span></div>
-  <div class="section-label">YOUR READING GUIDE</div>
   <div class="modes" role="group" aria-label="Reading guide style"><button data-mode="cursor"><span>↗</span>Cursor</button><button data-mode="highlight"><span>▰</span>Highlight</button><button data-mode="outline"><span>▱</span>Outline</button></div>
   <div class="appearance">
-    <div class="section-label">GUIDE COLOR</div><div class="colors" role="group" aria-label="Guide color">${Object.entries(palette).map(([name, color]) => `<button data-color="${name}" aria-label="${name}" title="${name}" style="--swatch:${color}"></button>`).join('')}</div>
-    <div class="cursor-options"><div class="section-label">CURSOR SHAPE</div><div class="shapes" role="group" aria-label="Cursor shape"><button data-shape="hand">${cursorIcon('hand')}<span>Hand</span></button><button data-shape="dot">${cursorIcon('dot')}<span>Dot</span></button><button data-shape="arrow">${cursorIcon('arrow')}<span>Arrow</span></button></div>
+    <div class="colors" role="group" aria-label="Guide color">${Object.entries(palette).map(([name, color]) => `<button data-color="${name}" aria-label="${name}" title="${name}" style="--swatch:${color}"></button>`).join('')}</div>
+    <div class="cursor-options"><div class="shapes" role="group" aria-label="Cursor shape"><button data-shape="hand">${cursorIcon('hand')}<span>Hand</span></button><button data-shape="dot">${cursorIcon('dot')}<span>Dot</span></button><button data-shape="arrow">${cursorIcon('arrow')}<span>Arrow</span></button></div>
     <label class="appearance-row">Size <output class="size-value">24 px</output><input type="range" aria-label="Cursor size" data-appearance="cursorSize" min="12" max="40" step="1" value="24"></label></div>
-    <label class="appearance-row thickness-row">Stroke thickness <output class="thickness-value">2</output><input type="range" aria-label="Stroke thickness" data-appearance="thickness" min="1" max="4" step="0.5" value="2"></label>
+    <label class="appearance-row thickness-row">Stroke <output class="thickness-value">2</output><input type="range" aria-label="Stroke thickness" data-appearance="thickness" min="1" max="4" step="0.5" value="2"></label>
   </div>
   <label class="group-option appearance-row" hidden>Words per highlight <select aria-label="Words per highlight"><option value="1">1 word</option><option value="2">2 words</option><option value="3">3 words</option><option value="4">4 words</option></select></label>
-  <div class="toggles"><label><span>Natural pauses<small>A breath at punctuation</small></span><input type="checkbox" data-setting="natural" checked></label><label><span>Follow down the page<small>Scroll along with your guide</small></span><input type="checkbox" data-setting="autoScroll" checked></label></div>
-  <div class="section-label">CHOOSE YOUR PASSAGE</div>
-  <div class="selection"><button data-command="pick-start">Set start word</button><button data-command="pick-end">Set end word</button></div>
-  <button class="area" data-command="pick-area">⌖ Choose a different reading area</button>
-  <div class="footnote"><kbd>Space</kbd> pause / play <span>·</span> <kbd>Esc</kbd> pause</div>
+  <div class="toggles"><label title="Pause longer at punctuation"><span>Natural pauses</span><input type="checkbox" data-setting="natural" checked></label><label><span>Auto-scroll</span><input type="checkbox" data-setting="autoScroll" checked></label></div>
+  <div class="selection"><button data-command="pick-start" aria-label="Set start word">Set start</button><button data-command="pick-end" aria-label="Set end word">Set end</button><button data-command="pick-area" aria-label="Choose a different reading area">Area</button></div>
   </div>
 `;
 
@@ -90,12 +84,12 @@ export function mountControls(container: HTMLElement, send: (command: Command) =
     snapshot = next;
     const set = (selector: string, value: string) => { container.querySelector(selector)!.textContent = value; };
     set('.status', next.status.replaceAll('-', ' ').toUpperCase());
-    set('h1', next.status === 'playing' ? 'One word at a time.' : next.status === 'finished' ? 'A little further along.' : 'Find your rhythm.');
     set('.message', next.message || next.title || 'Choose a word. Follow the flow.');
+    // Keep recovery/selection instructions visible; omit routine status prose.
+    (container.querySelector('.message') as HTMLElement).hidden = !(['idle', 'paused', 'picking-start', 'picking-end', 'picking-area'].includes(next.status));
     set('.position', next.count ? `${Math.max(0, next.index - next.start + 1)} / ${next.end - next.start + 1} words` : 'No passage selected');
     set('.word', next.word.slice(0, 24));
-    set('.primary[data-command="play"]', next.status === 'playing' ? 'Ⅱ Pause reading' : next.status === 'finished' ? '↻ Read again' : next.status === 'paused' ? '▶ Resume reading' : '▶ Start reading');
-    set('.pace-label', next.settings.natural ? 'BASE PACE' : 'EVEN PACE');
+    set('.primary[data-command="play"]', next.status === 'playing' ? 'Ⅱ Pause' : next.status === 'finished' ? '↻ Restart' : next.status === 'paused' ? '▶ Resume' : '▶ Play');
     (container.querySelector('.progress-fill') as HTMLElement).style.width = `${next.count ? Math.min(100, 100 * (next.index - next.start + 1) / (next.end - next.start + 1)) : 0}%`;
     controls.querySelectorAll<HTMLInputElement>('input[type="number"],input[type="range"]:not([data-appearance])').forEach(el => { if (el !== (container.getRootNode() as Document | ShadowRoot).activeElement) el.value = String(next.settings.wpm); });
     container.querySelectorAll<HTMLInputElement>('[data-appearance]').forEach(el => { if (el !== (container.getRootNode() as Document | ShadowRoot).activeElement) el.value = String(next.settings[el.dataset.appearance as 'cursorSize' | 'thickness']); });

@@ -23,11 +23,11 @@ On first opening, an interactive walkthrough lets you select a sample word, chan
 - **Choose a different reading area** highlights the prose container under your mouse; click to choose it, then select your first word.
 - Choose **Cursor**, **Highlight**, or **Outline**. This is a visual guide; your real mouse remains available.
 - In Cursor mode, choose a **Hand** (default), **Dot**, or **Arrow**. Adjust **Size** from 12–40 px. **Stroke thickness** adjusts the hand/arrow or word outline; the dot uses the size control.
-- The **Dot** sweeps from each word's leading edge across its width and the gap to the next word, with a short fading trail. Hand, arrow, highlight, and outline ease into each word/group. Line returns reposition directly without a diagonal trail. System reduced-motion preferences disable travel and trails.
+- **Hand, Dot, and Arrow** glide continuously across each word and the gap to the next. The dot adds a short fading trail. Cursor tips stay close to the text at every size. Highlight and outline ease into each word/group. Line returns reposition directly without a diagonal trail. System reduced-motion preferences disable travel and trails.
 - Choose a standard cursor/outline color: **green, blue, purple, red, orange, or black**.
 - In Highlight mode, select **1–4 words per highlight**. Groups stop at line/paragraph boundaries and your selected end word. Each group receives the combined reading time of its words, so 250 WPM is still 250 words per minute, not 250 groups.
 - Adjust speed between **60 and 1,000 WPM**. Natural pauses add time at punctuation and paragraph ends. Scrolling and browser slowdowns can extend elapsed reading time; words are never deliberately skipped to catch up.
-- The floating toolbar collapses during playback. Click its handle to pause and expand it. Drag the dotted top bar to move it.
+- The compact toolbar collapses during playback. Click its handle to pause and expand it. Drag the dotted top bar to move it. **Set start**, **Set end**, and **Area** choose the passage; **?** reopens the tutorial.
 - **Pause** saves your place. **Stop** returns to the selected start. **×** removes the guide and ends the session.
 
 With a reading session active, **Space** plays/pauses, **Escape** pauses or cancels selection, and **Alt+Left / Alt+Right** steps through words. Inputs and editable fields retain their normal typing behavior.

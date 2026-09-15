@@ -54,6 +54,7 @@ async function initialize() {
     :host{all:initial} .shell{font:14px/1.45 Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;text-align:left;letter-spacing:normal;color:#233b36;position:fixed;right:20px;bottom:20px;width:326px;max-width:calc(100vw - 24px);max-height:calc(100vh - 24px);overflow:auto;pointer-events:auto;border:1px solid #d4ddcb;border-radius:18px;box-shadow:0 12px 50px #102a2429;background:#f8f7f2;scrollbar-width:thin}
     .shell .panel{padding:18px}.shell .reading{margin-top:14px}.shell h1{font-size:25px}.shell .toggles{margin-top:8px}.shell .section-label{margin-top:13px}.chrome{display:flex;align-items:center;gap:5px;padding:7px 10px;border-bottom:1px solid #e3e7da;background:#edf0e6;position:sticky;top:0;z-index:2}.drag{flex:1;color:#7e8c73;letter-spacing:2px;font-size:12px;cursor:grab;touch-action:none;background:transparent;text-align:left}.chrome button:not(.drag){width:26px;height:26px;border-radius:6px;background:transparent;color:#5c7054}.chrome button:hover{background:#dce5d2}
     .handle{display:none;pointer-events:auto;background:#294e3e;color:#fffdf4;border-radius:28px;padding:11px 16px;box-shadow:0 5px 25px #19352b30;font-size:12px;white-space:nowrap}.shell.collapsed{width:auto;overflow:visible;background:none;border:0;box-shadow:none}.collapsed .chrome,.collapsed .panel{display:none}.collapsed .handle{display:block}
+    .shell:not(.collapsed){width:280px;border-radius:12px}.shell .panel{padding:12px}.shell .reading{margin-top:8px}.chrome{padding:3px 8px}.drag{font-size:10px}.handle{padding:8px 12px}
     ${guideCSS}
     .preview{position:fixed;pointer-events:none;border:2px dashed #68875b;border-radius:5px;background:#78945315;display:none}.hint{position:fixed;left:50%;top:16px;transform:translateX(-50%);max-width:calc(100vw - 30px);padding:11px 18px;background:#294e3e;color:#fff;border-radius:10px;font:13px/1.5 system-ui;box-shadow:0 4px 20px #0002;display:none;text-align:center;pointer-events:none}
   `;
@@ -62,7 +63,7 @@ async function initialize() {
   const preview = document.createElement('div'); preview.className = 'preview';
   const hint = document.createElement('div'); hint.className = 'hint'; hint.setAttribute('role', 'status');
   const shell = document.createElement('section'); shell.className = 'shell'; shell.setAttribute('aria-label', 'WordGlide controls');
-  shell.innerHTML = '<div class="chrome"><button class="drag" aria-label="Move reading controls">⠿ READING COMPANION</button><button class="collapse" aria-label="Collapse controls">−</button><button class="close" aria-label="Close reading guide">×</button></div><div class="panel"></div><button class="handle" aria-label="Expand reading controls">↗ WordGlide</button>';
+  shell.innerHTML = '<div class="chrome"><button class="drag" aria-label="Move reading controls">⠿</button><button class="collapse" aria-label="Collapse controls">−</button><button class="close" aria-label="Close reading guide">×</button></div><div class="panel"></div><button class="handle" aria-label="Expand reading controls">↗ WordGlide</button>';
   shadow.append(preview, hint, shell);
   document.documentElement.append(host);
   const renderUI = mountControls(shell.querySelector('.panel')!, command => { try { dispatch(command); } catch (error) { message = String(error); publish(); } }, () => pause('Paused while you read the quick guide.'));
@@ -101,13 +102,13 @@ async function initialize() {
     return last;
   }
   function guideRects(last = groupEnd()) { return tokens.slice(index, last + 1).flatMap(rects); }
-  function isDot() { return settings.mode === 'cursor' && settings.cursorShape === 'dot'; }
-  function sweepDot(progress: number, animate = !reduced.matches) {
+  function isCursor() { return settings.mode === 'cursor'; }
+  function sweepCursor(progress: number, animate = !reduced.matches) {
     guide.sweep(rects(tokens[index]), index < end ? rects(tokens[index + 1])[0] : undefined, reduced.matches ? 0 : progress, animate);
   }
   function drawStatic() {
     if (disposed || status.startsWith('picking') || !tokens[index]) return;
-    if (isDot()) sweepDot(wordDuration ? elapsed / wordDuration : 0, false);
+    if (isCursor()) sweepCursor(wordDuration ? elapsed / wordDuration : 0, false);
     else guide.move(guideRects());
   }
   function chooseRoot(next: HTMLElement, useSelection = false) {
@@ -217,7 +218,7 @@ async function initialize() {
     avoidToolbar(list);
     wordDuration = tokens.slice(index, activeEnd + 1).reduce((total, t) => total + durationFor(t, t.paragraphEnd, settings), 0);
     began = performance.now(); lastFrame = began;
-    if (isDot()) sweepDot(elapsed / wordDuration);
+    if (isCursor()) sweepCursor(elapsed / wordDuration);
     else guide.move(list, reduced.matches ? 0 : Math.min(travelDuration(wordDuration, false), Math.max(0, wordDuration - elapsed)));
     publish(false); raf = requestAnimationFrame(frame);
   }
@@ -234,7 +235,7 @@ async function initialize() {
     if (geometryDirty) { rectCache.clear(); geometryDirty = false; }
     const list = guideRects(activeEnd);
     if (!list.length) { pause('The current word is not visible. Scroll to it and resume.'); return; }
-    if (isDot()) sweepDot((elapsed + now - began) / wordDuration);
+    if (isCursor()) sweepCursor((elapsed + now - began) / wordDuration);
     else if (needsLayout) guide.move(list);
     if (elapsed + now - began >= wordDuration) {
       if (activeEnd >= end) { index = end; status = 'finished'; elapsed = 0; message = 'Passage complete. Take a breath, or read it again.'; publish(); return; }

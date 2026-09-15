@@ -107,7 +107,7 @@ export class Guide {
     this.fragments.replaceChildren(); this.visible = false; this.lastRects = [];
   }
 
-  // Drive the dot from the reader's clock: sweep the whole word and inter-word
+  // Drive every cursor from the reader's clock: sweep the whole word and inter-word
   // gap, never jump to its centre. Wrapped fragments get separate line sweeps.
   sweep(rects: DOMRect[], next: DOMRect | undefined, progress: number, animate: boolean) {
     if (!rects.length) { this.hide(); return; }
@@ -125,8 +125,13 @@ export class Guide {
     for (let i = 0; i < lines.length; i++) { r = lines[i]; if (distance <= r.width || i === lines.length - 1) break; distance -= r.width; }
     const target = r === lines.at(-1) && next && Math.abs(next.top - r.top) < 4 && next.left >= r.right ? next.left : r.right;
     const x = r.left + (target - r.left) * Math.min(1, distance / Math.max(1, r.width));
-    const size = this.settings.cursorSize, y = r.bottom + 3 + size * 9 / 32;
-    if (animate && this.lastDot && Math.abs(y - this.lastDot.y) < 4 && x > this.lastDot.x && x - this.lastDot.x < 80) {
+    const size = this.settings.cursorSize;
+    // The visible tip/edge stays one pixel below the text range, independent
+    // of SVG padding and selected size. The dot's white rim is included.
+    const edge = r.bottom + 1;
+    const y = edge + size * 9.75 / 32;
+    const dotShape = this.settings.cursorShape === 'dot';
+    if (dotShape && animate && this.lastDot && Math.abs(y - this.lastDot.y) < 4 && x > this.lastDot.x && x - this.lastDot.x < 80) {
       const dot = document.createElement('i'); dot.className = 'trail-dot';
       const diameter = size * 12 / 32;
       dot.style.cssText = `width:${diameter}px;height:${diameter}px;background:${palette[this.settings.color]};transform:translate3d(${this.lastDot.x - diameter / 2}px,${y - diameter / 2}px,0)`;
@@ -136,6 +141,8 @@ export class Guide {
     } else if (!animate || (this.lastDot && Math.abs(y - this.lastDot.y) >= 4)) this.trail.replaceChildren();
     this.lastDot = { x, y };
     this.marker.style.display = 'block'; this.marker.style.transition = 'none';
-    this.marker.style.transform = `translate3d(${x - size / 2}px,${y - size / 2}px,0)`;
+    const anchorX = dotShape ? .5 : this.settings.cursorShape === 'hand' ? .394 : 7 / 32;
+    const anchorY = dotShape ? 6.25 / 32 : this.settings.cursorShape === 'hand' ? (1.94 - this.settings.thickness * .485) / 32 : (3 - this.settings.thickness / 2) / 32;
+    this.marker.style.transform = `translate3d(${x - size * anchorX}px,${edge - size * anchorY}px,0)`;
   }
 }
