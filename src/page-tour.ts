@@ -1,13 +1,12 @@
 type Action = 'selected' | 'speed' | 'space-play' | 'space-pause' | 'escape';
-const expected: Action[] = ['selected', 'speed', 'space-play', 'space-pause', 'space-play', 'escape'];
+const expected: Action[] = ['selected', 'speed', 'space-play', 'space-pause', 'space-play'];
 const instructions = [
   'Click a word in the article to set your start. If no article is detected, choose its reading area first.',
   'Change WPM in the controls. Higher numbers read faster.',
   'Press Space to start. If a speed field is focused, press Tab to leave it first.',
   'Follow a few words, then press Space to pause.',
   'Press Space again to resume from your place.',
-  'Press Esc to pause. Unlike Space, Esc never resumes.',
-  'Done! Space pauses/resumes; Esc pauses. Click the floating handle for settings. Set end is optional. Manual scrolling also pauses reading.',
+  'Done! Space pauses/resumes. Click the circular WordGlide logo for settings. Esc is an optional pause/cancel key. Manual scrolling also pauses reading.',
 ];
 
 export class PageTour {
@@ -22,6 +21,7 @@ export class PageTour {
     shadow.append(this.element);
   }
   start() { this.step = 0; this.element.hidden = false; this.render(); }
+  isActive() { return this.step >= 0; }
   advance(action: Action) { if (this.step >= 0 && expected[this.step] === action) { this.step++; this.render(); } }
   stop() { this.step = -1; this.element.hidden = true; this.shadow.querySelector('.speed')?.classList.remove('tour-target'); }
   private render() {

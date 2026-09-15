@@ -14,7 +14,7 @@ The ready-to-load extension is in `dist/` after building.
 
 After rebuilding, click **Reload** on the extension card. Reload an already-open article if its old controls are still present; reactivating the extension also removes the old overlay.
 
-On first opening (or via **?**), choose **Use this page** for an on-page walkthrough. It follows your actual actions: pick a word, change WPM, use **Space to start, pause, and resume**, then **Esc to pause**. Tutorial speed changes are real settings. You can exit or start over anytime.
+On first opening (or via **?**), choose **Use this page** for a top-centered on-page walkthrough. It follows your actual actions: pick a word, change WPM, and use **Space to start, pause, and resume**. Esc remains an optional pause/cancel shortcut, not a required tutorial step. Tutorial speed changes are real settings. You can exit or start over anytime.
 
 **Open example blog** opens the linked Substack article only when you choose it. On that new tab, click WordGlide → **Use this page** to grant temporary page access and begin. No extra site permissions are requested. A small offline practice passage remains available under **Practise here instead**; it does not change page settings. Subscription dialogs or inaccessible content must be handled by the user; the tutorial does not bypass them.
 
@@ -26,10 +26,12 @@ On first opening (or via **?**), choose **Use this page** for an on-page walkthr
 - Choose **Cursor**, **Highlight**, or **Outline**. This is a visual guide; your real mouse remains available.
 - In Cursor mode, choose a **Hand** (default), **Dot**, or **Arrow**. Dot size is **1–30 px** (actual visible diameter); hand/arrow size is **12–40 px**. **Stroke** adjusts the hand/arrow or word outline.
 - **Hand, Dot, and Arrow** glide continuously across each word and the gap to the next. The dot adds a short fading trail. Cursor tips stay close to the text at every size. Highlight and outline ease into each word/group. Line returns reposition directly without a diagonal trail. System reduced-motion preferences disable travel and trails.
-- Choose a standard cursor/outline color: **green, blue, purple, red, orange, or black**.
+- **Auto** (the default for unset preferences) uses dark green on light article backgrounds and pale green on dark backgrounds. Or choose **green, blue, purple, red, orange, or black**. Saved colors from older versions are preserved; select Auto to enable adaptation. Background images/gradients may need a manual color.
 - In Highlight mode, select **1–4 words per highlight**. Groups stop at line/paragraph boundaries and your selected end word. Each group receives the combined reading time of its words, so 250 WPM is still 250 words per minute, not 250 groups.
 - Adjust speed between **60 and 1,000 WPM**. Natural pauses add time at punctuation and paragraph ends. Scrolling and browser slowdowns can extend elapsed reading time; words are never deliberately skipped to catch up.
-- The compact toolbar collapses during playback. Click its handle to pause and expand it. Drag the dotted top bar to move it. **Set start**, **Set end**, and **Area** choose the passage; **?** reopens the tutorial.
+- The toolbar collapses to a translucent circular WordGlide logo during playback. Click it to pause and expand; drag either the circle or the panel's dotted top bar to reposition it. Transparency uses simple opacity, not background blur. **Set start**, **Set end**, and **Area** choose the passage; **?** reopens the tutorial.
+- Turn off **Show page controls** in the extension popup to hide the panel and logo without stopping the reading guide. Restore them with the same switch. The tutorial temporarily shows controls when needed.
+- New lines get a **120 ms settling pause** before reading continues, without a diagonal sweep. This adds a little time beyond the base WPM.
 - **Pause** saves your place. **Stop** returns to the selected start. **×** removes the guide and ends the session.
 
 With a reading session active, **Space** plays/pauses, **Escape** pauses or cancels selection, and **Alt+Left / Alt+Right** steps through words. Inputs and editable fields retain their normal typing behavior.

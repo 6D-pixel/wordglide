@@ -36,6 +36,10 @@ Owned scroll position and a short final-event tolerance distinguish extension sc
 
 ## Verification and boundaries
 
+Automatic color resolution composites RGB/RGBA ancestor backgrounds at word/layout updates, not on every animation frame. Ancestor theme attributes and system color-scheme changes invalidate the result. Auto is the default for unset colors; previously saved manual colors remain unchanged. Image/gradient backgrounds are not sampled and can require manual selection.
+
+The word clock includes a 120ms hold when successive word ranges change lines. Cursor progress excludes that hold, so the guide settles at the new line before sweeping. Pause/resume retains elapsed hold time. The 40px circular control uses opacity only, and shares thresholded pointer dragging and saved position with the panel. A persisted visibility preference hides only the shell, not the reading guide; an active tutorial temporarily reveals the controls. The tutorial is top-centered and uses five required actions, with Esc retained as an optional shortcut.
+
 Unit tests cover segmentation, offsets, preference migration, natural timing, and travel limits. Browser tests load the extension in an isolated Playwright Chromium profile with a fixture-only host grant; production permissions are unchanged. Tests cover actual content messaging, selection, modes, scrolling, mutation handling, reinjection, appearance settings, introductory guidance, and UI screenshots. Motion tests sample computed positions over multiple frames to distinguish real interpolation from word-to-word jumps, including words split by inline formatting.
 
 V1 is local-only and optimized for left-to-right prose. Reading-order heuristics, page overlays, animated content, and arbitrary site DOM conventions remain compatibility boundaries. The extension does not manipulate the native OS cursor or promise medical/educational outcomes.

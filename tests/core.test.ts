@@ -53,7 +53,10 @@ test('group size and palette are bounded and migrate safely', () => {
   assert.equal(sanitizeSettings({ groupSize: NaN }).groupSize, 1);
   assert.equal(sanitizeSettings({ groupSize: -3 }).groupSize, 1);
   assert.equal(sanitizeSettings({ color: 'blue' }).color, 'blue');
-  assert.equal(sanitizeSettings({ color: 'invalid' as any }).color, 'green');
+  assert.equal(sanitizeSettings({ color: 'invalid' as any }).color, 'auto');
+  assert.equal(sanitizeSettings().color, 'auto');
+  assert.equal(sanitizeSettings({ color: 'green' }).color, 'green');
+  assert.equal(sanitizeSettings({ showControls: false }).showControls, false);
 });
 test('dot sizes use 1–30 pixels while hand and arrow retain 12–40', () => {
   assert.equal(sanitizeSettings({ cursorShape: 'dot', cursorSize: 0 }).cursorSize, 1);

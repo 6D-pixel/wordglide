@@ -1,6 +1,10 @@
 :root,:host{font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#233b36;font-size:14px;color-scheme:light;line-height:1.45;font-weight:400;text-align:left}
 html{max-height:600px;overflow:auto}
 [hidden]{display:none!important}
+.handle{touch-action:none;cursor:grab}.handle:active{cursor:grabbing}
+.visibility-option{display:flex;align-items:center;justify-content:space-between;font-size:11px;margin:7px 0}.visibility-option input{accent-color:#386c46}.shell .visibility-option{display:none}
+.colors .auto-color{width:36px;border-radius:8px;background:#edf0e6;color:#386c46;font-weight:600;font-size:9px}
+.page-tour.page-tour{top:12px;left:50%;transform:translateX(-50%);width:340px;z-index:3}
 .tour-target{outline:2px solid #be8032;outline-offset:4px;border-radius:6px}
 .page-tour{position:fixed;top:75px;left:12px;width:250px;max-width:calc(100vw - 24px);padding:12px;border:1px solid #a5b99b;border-radius:10px;background:#fffdf5;box-shadow:0 4px 20px #0002;color:#233b36;font:12px/1.5 system-ui;pointer-events:auto}.page-tour p{margin:7px 0}.page-tour button{padding:5px 10px;background:#e4eddf;border-radius:6px;color:#233b36}.practice{margin-top:16px}.practice summary{cursor:pointer;font-size:12px;color:#386c46}
 /* Compact controls; tutorial copy keeps its own comfortable spacing. */

@@ -1,6 +1,6 @@
 export const walkthroughHTML = `
   <h2>Learn on a blog</h2>
-  <p>Use your current article, or open the example in a new tab. We’ll practise picking a word, speed, Space to pause/resume, and Esc.</p>
+  <p>Use your current article, or open the example in a new tab. We’ll practise picking a word, speed, and Space to pause/resume.</p>
   <button class="primary tour-current">Use this page</button>
   <button class="area tour-example">Open example blog ↗</button>
   <p class="welcome-note">Example: “What happens when you pay over Lightning” on Substack. On the new tab, click WordGlide → Use this page to grant access and begin.</p>

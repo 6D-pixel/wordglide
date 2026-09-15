@@ -1,8 +1,8 @@
 export type Mode = 'cursor' | 'highlight' | 'outline';
 export type CursorShape = 'hand' | 'dot' | 'arrow';
 export const palette = { green: '#386c46', blue: '#2563eb', purple: '#9333ea', red: '#dc2626', orange: '#ea580c', black: '#202020' } as const;
-export type Settings = { wpm: number; mode: Mode; natural: boolean; autoScroll: boolean; cursorShape: CursorShape; cursorSize: number; thickness: number; color: keyof typeof palette; groupSize: number };
-export const defaults: Settings = { wpm: 250, mode: 'cursor', natural: true, autoScroll: true, cursorShape: 'hand', cursorSize: 24, thickness: 2, color: 'green', groupSize: 1 };
+export type Settings = { wpm: number; mode: Mode; natural: boolean; autoScroll: boolean; cursorShape: CursorShape; cursorSize: number; thickness: number; color: keyof typeof palette | 'auto'; groupSize: number; showControls: boolean };
+export const defaults: Settings = { wpm: 250, mode: 'cursor', natural: true, autoScroll: true, cursorShape: 'hand', cursorSize: 24, thickness: 2, color: 'auto', groupSize: 1, showControls: true };
 export type Segment = { text: string; start: number; end: number; punctuation: string };
 
 export function sanitizeSettings(value: Partial<Settings> = {}): Settings {
@@ -11,10 +11,11 @@ export function sanitizeSettings(value: Partial<Settings> = {}): Settings {
     mode: ['cursor', 'highlight', 'outline'].includes(value.mode ?? '') ? value.mode! : defaults.mode,
     natural: typeof value.natural === 'boolean' ? value.natural : defaults.natural,
     autoScroll: typeof value.autoScroll === 'boolean' ? value.autoScroll : defaults.autoScroll,
+    showControls: typeof value.showControls === 'boolean' ? value.showControls : true,
     cursorShape: ['hand', 'dot', 'arrow'].includes(value.cursorShape ?? '') ? value.cursorShape! : defaults.cursorShape,
     cursorSize: typeof value.cursorSize === 'number' && Number.isFinite(value.cursorSize) ? Math.max(value.cursorShape === 'dot' ? 1 : 12, Math.min(value.cursorShape === 'dot' ? 30 : 40, Math.round(value.cursorSize))) : defaults.cursorSize,
     thickness: typeof value.thickness === 'number' && Number.isFinite(value.thickness) ? Math.max(1, Math.min(4, Math.round(value.thickness * 2) / 2)) : defaults.thickness,
-    color: Object.hasOwn(palette, value.color ?? '') ? value.color! : defaults.color,
+    color: value.color === 'auto' || Object.hasOwn(palette, value.color ?? '') ? value.color! : defaults.color,
     groupSize: typeof value.groupSize === 'number' && Number.isFinite(value.groupSize) ? Math.max(1, Math.min(4, Math.round(value.groupSize))) : 1,
   };
 }

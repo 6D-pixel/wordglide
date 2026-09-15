@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.0
+
+- Translucent, draggable circular logo in place of the WPM control pill.
+- Popup switch to hide/show floating controls while keeping the reading guide active.
+- Auto colors adapt to light/dark article surfaces; manual selections stay saved.
+- Top-centered tutorial teaches Space; Esc is optional.
+- 120ms settling pause on new lines.
+
 ## 0.4.0
 
 - Distance-based smooth auto-scroll with gentle acceleration/deceleration.

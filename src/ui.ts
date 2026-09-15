@@ -16,13 +16,14 @@ export const controlsHTML = `
   <input class="range" aria-label="Reading speed slider" type="range" min="60" max="1000" step="10" value="250">
   <div class="modes" role="group" aria-label="Reading guide style"><button data-mode="cursor"><span>↗</span>Cursor</button><button data-mode="highlight"><span>▰</span>Highlight</button><button data-mode="outline"><span>▱</span>Outline</button></div>
   <div class="appearance">
-    <div class="colors" role="group" aria-label="Guide color">${Object.entries(palette).map(([name, color]) => `<button data-color="${name}" aria-label="${name}" title="${name}" style="--swatch:${color}"></button>`).join('')}</div>
+    <div class="colors" role="group" aria-label="Guide color"><button class="auto-color" data-color="auto" aria-label="Automatic page color" title="Auto: adapts to light or dark article backgrounds">Auto</button>${Object.entries(palette).map(([name, color]) => `<button data-color="${name}" aria-label="${name}" title="${name}" style="--swatch:${color}"></button>`).join('')}</div>
     <div class="cursor-options"><div class="shapes" role="group" aria-label="Cursor shape"><button data-shape="hand">${cursorIcon('hand')}<span>Hand</span></button><button data-shape="dot">${cursorIcon('dot')}<span>Dot</span></button><button data-shape="arrow">${cursorIcon('arrow')}<span>Arrow</span></button></div>
     <label class="appearance-row">Size <output class="size-value">24 px</output><input type="range" aria-label="Cursor size" data-appearance="cursorSize" min="12" max="40" step="1" value="24"></label></div>
     <label class="appearance-row thickness-row">Stroke <output class="thickness-value">2</output><input type="range" aria-label="Stroke thickness" data-appearance="thickness" min="1" max="4" step="0.5" value="2"></label>
   </div>
   <label class="group-option appearance-row" hidden>Words per highlight <select aria-label="Words per highlight"><option value="1">1 word</option><option value="2">2 words</option><option value="3">3 words</option><option value="4">4 words</option></select></label>
   <div class="toggles"><label title="Pause longer at punctuation"><span>Natural pauses</span><input type="checkbox" data-setting="natural" checked></label><label><span>Auto-scroll</span><input type="checkbox" data-setting="autoScroll" checked></label></div>
+  <label class="visibility-option"><span>Show page controls</span><input type="checkbox" data-setting="showControls" checked></label>
   <div class="selection"><button data-command="pick-start" aria-label="Set start word">Set start</button><button data-command="pick-end" aria-label="Set end word">Set end</button><button data-command="pick-area" aria-label="Choose a different reading area">Area</button></div>
   </div>
 `;
@@ -69,7 +70,7 @@ export function mountControls(container: HTMLElement, send: (command: Command) =
       return;
     }
     if (welcome.contains(button)) return;
-    if (button.dataset.color) send({ type: 'settings', settings: { color: button.dataset.color as keyof typeof palette } });
+    if (button.dataset.color) send({ type: 'settings', settings: { color: button.dataset.color as Snapshot['settings']['color'] } });
     if (button.dataset.command) {
       let type = button.dataset.command as Command['type'];
       if (type === 'play' && snapshot?.status === 'playing') type = 'pause';
@@ -116,7 +117,7 @@ export function mountControls(container: HTMLElement, send: (command: Command) =
     (container.querySelector('.cursor-options') as HTMLElement).hidden = next.settings.mode !== 'cursor';
     (container.querySelector('.thickness-row') as HTMLElement).hidden = next.settings.mode === 'cursor' && next.settings.cursorShape === 'dot';
     container.querySelectorAll<HTMLButtonElement>('[data-mode]').forEach(el => { el.setAttribute('aria-pressed', String(el.dataset.mode === next.settings.mode)); });
-    container.querySelectorAll<HTMLInputElement>('[data-setting]').forEach(el => { el.checked = next.settings[el.dataset.setting as 'natural' | 'autoScroll']; });
+    container.querySelectorAll<HTMLInputElement>('[data-setting]').forEach(el => { el.checked = next.settings[el.dataset.setting as 'natural' | 'autoScroll' | 'showControls']; });
   };
   return Object.assign(update, { closeIntro: () => showIntro(false), isIntroOpen: () => introOpen, dispose: () => { disposed = true; tour.dispose(); chrome.storage.onChanged.removeListener(storageListener); } });
 }

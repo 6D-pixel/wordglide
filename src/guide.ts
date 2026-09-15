@@ -1,4 +1,5 @@
 import { defaults, palette, type CursorShape, type Settings } from './core.ts';
+import { surfaceColor } from './theme.ts';
 
 // Fixed viewBoxes preserve the proportions at every user-selected size.
 export function cursorIcon(shape: CursorShape): string {
@@ -26,6 +27,7 @@ export class Guide {
   private settings: Settings = { ...defaults };
   private lastRects: DOMRect[] = [];
   private visible = false;
+  private color = '#386c46';
 
   constructor(shadow: ShadowRoot) {
     this.marker.className = 'guide marker';
@@ -45,9 +47,16 @@ export class Guide {
     this.marker.style.width = `${settings.cursorSize}px`;
     this.marker.style.height = `${settings.cursorSize}px`;
     this.marker.style.setProperty('--guide-stroke', String(settings.thickness));
-    this.marker.style.color = palette[settings.color];
+    this.color = settings.color === 'auto' ? this.color : palette[settings.color];
+    this.marker.style.color = this.color;
     this.trail.replaceChildren(); this.lastDot = undefined;
     this.fragments.style.setProperty('--guide-stroke', `${settings.thickness}px`);
+  }
+
+  setSurface(element: Element) {
+    this.color = this.settings.color === 'auto' ? surfaceColor(element) : palette[this.settings.color];
+    this.marker.style.color = this.color;
+    for (const fragment of this.fragments.children) (fragment as HTMLElement).style.borderColor = this.color;
   }
 
   move(rects: DOMRect[], duration = 0) {
@@ -82,7 +91,7 @@ export class Guide {
       rects.forEach((r, i) => {
         const el = (this.fragments.children[i] ?? this.fragments.appendChild(document.createElement('div'))) as HTMLElement;
         el.className = `fragment ${this.settings.mode === 'outline' ? 'outline' : ''}`;
-        el.style.borderColor = palette[this.settings.color];
+        el.style.borderColor = this.color;
         el.style.transition = transition;
         el.style.transform = `translate3d(${r.left - 2}px,${r.top - 1}px,0)`;
         el.style.width = `${r.width + 4}px`;
@@ -127,14 +136,14 @@ export class Guide {
     const x = r.left + (target - r.left) * Math.min(1, distance / Math.max(1, r.width));
     const size = this.settings.cursorSize;
     // The visible tip/edge stays one pixel below the text range, independent
-    // of SVG padding and selected size. The dot's white rim is included.
+    // of SVG padding and selected size.
     const edge = r.bottom + 1;
     const y = edge + size / 2;
     const dotShape = this.settings.cursorShape === 'dot';
     if (dotShape && animate && this.lastDot && Math.abs(y - this.lastDot.y) < 4 && x > this.lastDot.x && x - this.lastDot.x < 80) {
       const dot = document.createElement('i'); dot.className = 'trail-dot';
       const diameter = size * 12 / 32;
-      dot.style.cssText = `width:${diameter}px;height:${diameter}px;background:${palette[this.settings.color]};transform:translate3d(${this.lastDot.x - diameter / 2}px,${y - diameter / 2}px,0)`;
+      dot.style.cssText = `width:${diameter}px;height:${diameter}px;background:${this.color};transform:translate3d(${this.lastDot.x - diameter / 2}px,${y - diameter / 2}px,0)`;
       this.trail.append(dot);
       dot.addEventListener('animationend', () => dot.remove(), { once: true });
       while (this.trail.childElementCount > 16) this.trail.firstElementChild!.remove();

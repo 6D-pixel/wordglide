@@ -520,20 +520,23 @@ test('dot edge stays close to text at every size and controls fit a small panel'
 test('on-page tutorial teaches actual selection and Space pause/resume and Escape', async () => {
   const { page, tabId } = await open({ intro: true });
   await page.locator('.tour-current').click();
-  await expect(page.locator('.page-tour-title')).toHaveText('Tutorial · 1/6');
+  await expect(page.locator('.page-tour-title')).toHaveText('Tutorial · 1/5');
+  const tourBox = (await page.locator('.page-tour').boundingBox())!;
+  expect(tourBox.y).toBe(12); expect(tourBox.x + tourBox.width / 2).toBeCloseTo(640, 0);
   const first = await point(page, '#first', 'Start'); await page.mouse.click(first.x, first.y);
-  await expect(page.locator('.page-tour-title')).toHaveText('Tutorial · 2/6');
+  await expect(page.locator('.page-tour-title')).toHaveText('Tutorial · 2/5');
   await expect(page.locator('.speed')).toHaveClass(/tour-target/);
   await page.getByRole('spinbutton', { name: 'Words per minute' }).fill('200');
   await page.keyboard.press('Tab');
-  await expect(page.locator('.page-tour-title')).toHaveText('Tutorial · 3/6');
-  for (const [key, step, status] of [['Space', '4', 'playing'], ['Space', '5', 'paused'], ['Space', '6', 'playing']] as const) {
+  await expect(page.locator('.page-tour-title')).toHaveText('Tutorial · 3/5');
+  for (const [key, step, status] of [['Space', '4', 'playing'], ['Space', '5', 'paused']] as const) {
     await page.keyboard.press(key);
-    await expect(page.locator('.page-tour-title')).toHaveText(`Tutorial · ${step}/6`);
+    await expect(page.locator('.page-tour-title')).toHaveText(`Tutorial · ${step}/5`);
     expect((await command(tabId, { type: 'snapshot' })).status).toBe(status);
   }
-  await page.keyboard.press('Escape');
+  await page.keyboard.press('Space');
   await expect(page.locator('.page-tour-title')).toHaveText('You’re ready');
+  await page.keyboard.press('Escape');
   expect((await command(tabId, { type: 'snapshot' })).status).toBe('paused');
   await page.screenshot({ path: 'test-results/on-page-tour.png' });
   await page.locator('.page-tour').getByRole('button', { name: 'Done', exact: true }).click();
@@ -590,10 +593,86 @@ test('popup starts a pending on-page tutorial and hands focus back to the articl
   const closed = popup.waitForEvent('close');
   await popup.locator('.tour-current').evaluate((el: HTMLButtonElement) => el.click());
   await closed;
-  await expect(page.locator('.page-tour-title')).toHaveText('Tutorial · 1/6');
+  await expect(page.locator('.page-tour-title')).toHaveText('Tutorial · 1/5');
   expect((await command(tabId, { type: 'snapshot' })).status).toBe('picking-start');
   expect(await worker.evaluate(async () => (await chrome.storage.session.get('tutorialTab')).tutorialTab)).toBeUndefined();
   await page.locator('.page-tour').getByRole('button', { name: 'Exit tutorial' }).click();
   await expect(page.locator('.page-tour')).toBeHidden();
+  await page.close();
+});
+
+test('automatic color follows article backgrounds while manual color persists', async () => {
+  const { page, tabId } = await open();
+  await expect(page.locator('[data-color="auto"]')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('.marker')).toHaveCSS('color', 'rgb(56, 108, 70)');
+  await page.evaluate(() => { document.body.style.backgroundColor = '#111'; document.body.style.color = '#eee'; });
+  await expect(page.locator('.marker')).toHaveCSS('color', 'rgb(183, 245, 139)');
+  await page.locator('[data-color="blue"]').click();
+  await page.evaluate(() => { document.body.style.backgroundColor = '#fff'; });
+  await expect(page.locator('.marker')).toHaveCSS('color', 'rgb(37, 99, 235)');
+  await command(tabId, { type: 'dispose' });
+  await worker.evaluate(async id => { await chrome.scripting.executeScript({ target: { tabId: id }, files: ['content.js'] }); }, tabId);
+  await expect(page.locator('[data-color="blue"]')).toHaveAttribute('aria-pressed', 'true');
+  await page.locator('[data-color="auto"]').click();
+  await page.evaluate(() => { document.body.style.backgroundColor = '#111'; });
+  await expect(page.locator('.marker')).toHaveCSS('color', 'rgb(183, 245, 139)');
+  await page.evaluate(() => { document.querySelector('article')!.style.backgroundColor = '#fff'; });
+  await expect(page.locator('.marker')).toHaveCSS('color', 'rgb(56, 108, 70)');
+  await page.screenshot({ path: 'test-results/auto-color.png' });
+  await page.close();
+});
+
+test('circular translucent control drags without opening and expanded controls also drag', async () => {
+  const { page, tabId } = await open();
+  await command(tabId, { type: 'settings', settings: { wpm: 60 } });
+  await command(tabId, { type: 'play' });
+  const handle = page.getByRole('button', { name: 'Expand reading controls' });
+  await expect(handle).toHaveText('↗'); await expect(handle).toHaveCSS('opacity', '0.65');
+  const first = (await handle.boundingBox())!;
+  expect(first.width).toBe(40); expect(first.height).toBe(40);
+  await page.mouse.move(first.x + 20, first.y + 20); await page.mouse.down();
+  await page.mouse.move(first.x - 160, first.y - 150, { steps: 8 }); await page.mouse.up();
+  await expect(page.locator('.shell')).toHaveClass(/collapsed/);
+  expect((await command(tabId, { type: 'snapshot' })).status).toBe('playing');
+  const moved = (await handle.boundingBox())!; expect(moved.x).toBeLessThan(first.x - 100);
+  await handle.click();
+  await expect(page.locator('.shell')).not.toHaveClass(/collapsed/);
+  const grip = (await page.getByRole('button', { name: 'Move reading controls' }).boundingBox())!;
+  const before = (await page.locator('.shell').boundingBox())!;
+  await page.mouse.move(grip.x + 20, grip.y + 10); await page.mouse.down();
+  await page.mouse.move(grip.x - 80, grip.y - 60, { steps: 8 }); await page.mouse.up();
+  expect((await page.locator('.shell').boundingBox())!.x).toBeLessThan(before.x - 50);
+  expect(await worker.evaluate(async () => (await chrome.storage.local.get('toolbarPosition')).toolbarPosition)).toMatchObject({ x: expect.any(Number), y: expect.any(Number) });
+  await page.close();
+});
+
+test('popup hides and restores the controls without removing the guide', async () => {
+  const { page, tabId } = await open();
+  const popup = await context.newPage();
+  await popup.goto(`chrome-extension://${new URL(worker.url()).host}/popup.html`);
+  await page.bringToFront();
+  const visibility = popup.getByRole('checkbox', { name: 'Show page controls' });
+  await visibility.evaluate((el: HTMLInputElement) => el.click());
+  await expect(page.locator('.shell')).toBeHidden();
+  await command(tabId, { type: 'play' });
+  await expect(page.locator('.marker')).toBeVisible();
+  expect((await command(tabId, { type: 'snapshot' })).status).toBe('playing');
+  await visibility.evaluate((el: HTMLInputElement) => el.click());
+  await expect(page.locator('.shell')).toBeVisible();
+  await expect(visibility).toBeChecked();
+  await popup.close(); await page.close();
+});
+
+test('new lines get a short settling pause before the cursor sweeps again', async () => {
+  const { page, tabId } = await open();
+  await command(tabId, { type: 'pick-start' });
+  const last = await point(page, '#first', 'curiosity'); await page.mouse.click(last.x, last.y);
+  await command(tabId, { type: 'settings', settings: { cursorShape: 'dot', wpm: 120, natural: false } });
+  await command(tabId, { type: 'play' });
+  await page.waitForFunction(() => document.querySelector('[data-wordglide]')!.shadowRoot!.querySelector('.word')!.textContent === 'Reading');
+  const x = () => page.locator('.marker').evaluate(el => el.getBoundingClientRect().left);
+  const first = await x();
+  await page.waitForTimeout(60); expect(await x()).toBeCloseTo(first, 1);
+  await page.waitForTimeout(180); expect(await x()).toBeGreaterThan(first + 2);
   await page.close();
 });

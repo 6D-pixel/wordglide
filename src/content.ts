@@ -29,12 +29,13 @@ async function initialize() {
   let raf = 0;
   let epoch = 0;
   let elapsed = 0, began = 0, wordDuration = 0, lastFrame = 0;
+  let lineHold = 0;
   let rectCache = new Map<number, DOMRect[]>();
   let geometryDirty = true;
   let pickingPreview: Token | HTMLElement | undefined;
   let lastBroadcast = 0;
   let rebuildTimer = 0;
-  let scrollTask: { scroller: HTMLElement; target: number; expected: number; from: number; began: number; duration: number; done: () => void; epoch: number } | undefined;
+  let scrollTask: { scroller: HTMLElement; target: number; expected: number; from: number; began: number; lastFrame?: number; duration: number; done: () => void; epoch: number } | undefined;
   const geometryRecovery = new Set<number>();
   let lastOwnedScroll: { scroller: HTMLElement; position: number; at: number } | undefined;
   let scrollAttempts = 0;
@@ -56,6 +57,7 @@ async function initialize() {
     .shell .panel{padding:18px}.shell .reading{margin-top:14px}.shell h1{font-size:25px}.shell .toggles{margin-top:8px}.shell .section-label{margin-top:13px}.chrome{display:flex;align-items:center;gap:5px;padding:7px 10px;border-bottom:1px solid #e3e7da;background:#edf0e6;position:sticky;top:0;z-index:2}.drag{flex:1;color:#7e8c73;letter-spacing:2px;font-size:12px;cursor:grab;touch-action:none;background:transparent;text-align:left}.chrome button:not(.drag){width:26px;height:26px;border-radius:6px;background:transparent;color:#5c7054}.chrome button:hover{background:#dce5d2}
     .handle{display:none;pointer-events:auto;background:#294e3e;color:#fffdf4;border-radius:28px;padding:11px 16px;box-shadow:0 5px 25px #19352b30;font-size:12px;white-space:nowrap}.shell.collapsed{width:auto;overflow:visible;background:none;border:0;box-shadow:none}.collapsed .chrome,.collapsed .panel{display:none}.collapsed .handle{display:block}
     .shell:not(.collapsed){width:280px;border-radius:12px}.shell .panel{padding:12px}.shell .reading{margin-top:8px}.chrome{padding:3px 8px}.drag{font-size:10px}.handle{padding:8px 12px}
+    .handle{width:40px;height:40px;padding:0;border-radius:50%;font-size:27px;line-height:40px;opacity:.65;transition:opacity .15s}.handle:hover,.handle:focus-visible{opacity:1}
     ${guideCSS}
     .preview{position:fixed;pointer-events:none;border:2px dashed #68875b;border-radius:5px;background:#78945315;display:none}.hint{position:fixed;left:50%;top:16px;transform:translateX(-50%);max-width:calc(100vw - 30px);padding:11px 18px;background:#294e3e;color:#fff;border-radius:10px;font:13px/1.5 system-ui;box-shadow:0 4px 20px #0002;display:none;text-align:center;pointer-events:none}
   `;
@@ -64,7 +66,7 @@ async function initialize() {
   const preview = document.createElement('div'); preview.className = 'preview';
   const hint = document.createElement('div'); hint.className = 'hint'; hint.setAttribute('role', 'status');
   const shell = document.createElement('section'); shell.className = 'shell'; shell.setAttribute('aria-label', 'WordGlide controls');
-  shell.innerHTML = '<div class="chrome"><button class="drag" aria-label="Move reading controls">⠿</button><button class="collapse" aria-label="Collapse controls">−</button><button class="close" aria-label="Close reading guide">×</button></div><div class="panel"></div><button class="handle" aria-label="Expand reading controls">↗ WordGlide</button>';
+  shell.innerHTML = '<div class="chrome"><button class="drag" aria-label="Move reading controls">⠿</button><button class="collapse" aria-label="Collapse controls">−</button><button class="close" aria-label="Close reading guide">×</button></div><div class="panel"></div><button class="handle" aria-label="Expand reading controls"><span aria-hidden="true">↗</span></button>';
   shadow.append(preview, hint, shell);
   document.documentElement.append(host);
   const renderUI = mountControls(shell.querySelector('.panel')!, command => { try { dispatch(command); } catch (error) { message = String(error); publish(); } }, () => pause('Paused while you read the quick guide.'));
@@ -76,8 +78,10 @@ async function initialize() {
   function publish(force = true) {
     if (disposed) return;
     const state = snapshot(); renderUI(state);
+    shell.hidden = !settings.showControls && !pageTour.isActive();
+    if (!shell.hidden) clampShell();
     const handle = shell.querySelector('.handle')!;
-    handle.textContent = status === 'playing' ? `Ⅱ ${settings.wpm} WPM · Controls` : `↗ ${settings.wpm} WPM · Controls`;
+    handle.setAttribute('title', status === 'playing' ? 'Pause and open WordGlide controls' : 'Open WordGlide controls');
     if (force || performance.now() - lastBroadcast > 180) {
       lastBroadcast = performance.now();
       try { void chrome.runtime.sendMessage({ channel: 'wordglide-state', snapshot: state }).catch(() => { if (!chrome.runtime?.id) dispose(); }); } catch { dispose(); }
@@ -108,9 +112,11 @@ async function initialize() {
   function sweepCursor(progress: number, animate = !reduced.matches) {
     guide.sweep(rects(tokens[index]), index < end ? rects(tokens[index + 1])[0] : undefined, reduced.matches ? 0 : progress, animate);
   }
+  function wordProgress(time: number) { return Math.max(0, time - lineHold) / Math.max(1, wordDuration - lineHold); }
   function drawStatic() {
     if (disposed || status.startsWith('picking') || !tokens[index]) return;
-    if (isCursor()) sweepCursor(wordDuration ? elapsed / wordDuration : 0, false);
+    guide.setSurface(tokens[index].block.element);
+    if (isCursor()) sweepCursor(wordProgress(elapsed), false);
     else guide.move(guideRects());
   }
   function chooseRoot(next: HTMLElement, useSelection = false) {
@@ -197,6 +203,11 @@ async function initialize() {
   function animateScroll(now: number) {
     const task = scrollTask;
     if (!task || task.epoch !== epoch || status !== 'playing') return;
+    // Start on the first rendered frame; a delayed callback must not skip the
+    // gentle acceleration. Freeze time across long main-thread stalls too.
+    if (task.lastFrame === undefined) task.began = now;
+    else if (now - task.lastFrame > 100) task.began += now - task.lastFrame;
+    task.lastFrame = now;
     const progress = task.duration ? Math.min(1, (now - task.began) / task.duration) : 1;
     const eased = scrollEase(progress);
     task.expected = task.from + (task.target - task.from) * eased;
@@ -217,10 +228,13 @@ async function initialize() {
     activeEnd = groupEnd();
     const list = guideRects(activeEnd);
     if (!list.length) { pause('This word has no visible position. Scroll it into view and resume.'); return; }
+    guide.setSurface(token.block.element);
     avoidToolbar(list);
-    wordDuration = tokens.slice(index, activeEnd + 1).reduce((total, t) => total + durationFor(t, t.paragraphEnd, settings), 0);
+    const previousLine = index > start ? rects(tokens[index - 1]).at(-1) : undefined;
+    lineHold = previousLine && Math.abs(previousLine.top - list[0].top) >= 4 ? 120 : 0;
+    wordDuration = lineHold + tokens.slice(index, activeEnd + 1).reduce((total, t) => total + durationFor(t, t.paragraphEnd, settings), 0);
     began = performance.now(); lastFrame = began;
-    if (isCursor()) sweepCursor(elapsed / wordDuration);
+    if (isCursor()) sweepCursor(wordProgress(elapsed));
     else guide.move(list, reduced.matches ? 0 : Math.min(travelDuration(wordDuration, false), Math.max(0, wordDuration - elapsed)));
     publish(false); raf = requestAnimationFrame(frame);
   }
@@ -237,7 +251,8 @@ async function initialize() {
     if (geometryDirty) { rectCache.clear(); geometryDirty = false; }
     const list = guideRects(activeEnd);
     if (!list.length) { pause('The current word is not visible. Scroll to it and resume.'); return; }
-    if (isCursor()) sweepCursor((elapsed + now - began) / wordDuration);
+    if (needsLayout) guide.setSurface(tokens[index].block.element);
+    if (isCursor()) sweepCursor(wordProgress(elapsed + now - began));
     else if (needsLayout) guide.move(list);
     if (elapsed + now - began >= wordDuration) {
       if (activeEnd >= end) { index = end; status = 'finished'; elapsed = 0; message = 'Passage complete. Take a breath, or read it again.'; publish(); return; }
@@ -312,7 +327,7 @@ async function initialize() {
   function dispose() {
     if (disposed) return;
     disposed = true; epoch++; cancelAnimationFrame(raf); clearTimeout(rebuildTimer); abort.abort();
-    observer.disconnect(); navigationObserver.disconnect(); resizeObserver.disconnect();
+    observer.disconnect(); navigationObserver.disconnect(); resizeObserver.disconnect(); themeObserver.disconnect();
     renderUI.dispose();
     guide.hide();
     try { chrome.runtime.onMessage.removeListener(listener); } catch { /* An extension update may have invalidated this context. */ }
@@ -337,26 +352,40 @@ async function initialize() {
     }, 180);
   });
   const resizeObserver = new ResizeObserver(invalidate);
+  const themeObserver = new MutationObserver(invalidate);
   const navigationObserver = new MutationObserver(() => {
     if (location.href !== originalURL || (root && !root.isConnected)) dispose();
   });
   navigationObserver.observe(document.documentElement, { childList: true, subtree: true });
   function observeRoot() {
-    observer.disconnect(); resizeObserver.disconnect();
+    observer.disconnect(); resizeObserver.disconnect(); themeObserver.disconnect();
     if (root) { observer.observe(root, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['class', 'style', 'hidden', 'open'] }); resizeObserver.observe(root); }
+    for (let ancestor = root?.parentElement; ancestor; ancestor = ancestor.parentElement) themeObserver.observe(ancestor, { attributes: true, attributeFilter: ['class', 'style', 'data-theme', 'data-color-mode'] });
   }
   on(document, 'wordglide:dispose', dispose);
   on(shell.querySelector('.collapse')!, 'click', () => setCollapsed(true));
-  on(shell.querySelector('.handle')!, 'click', () => { if (status === 'playing') pause('Paused while you adjust your controls.'); setCollapsed(false); });
+  let draggedHandle = false;
+  on(shell.querySelector('.handle')!, 'click', () => { if (draggedHandle) { draggedHandle = false; return; } if (status === 'playing') pause('Paused while you adjust your controls.'); setCollapsed(false); });
   on(shell.querySelector('.close')!, 'click', dispose);
-  const drag = shell.querySelector('.drag') as HTMLButtonElement;
-  let dragging: { x: number; y: number; left: number; top: number } | undefined;
-  on(drag, 'pointerdown', event => {
-    const e = event as PointerEvent; const r = shell.getBoundingClientRect();
-    dragging = { x: e.clientX, y: e.clientY, left: r.left, top: r.top }; drag.setPointerCapture(e.pointerId); e.preventDefault();
-  });
-  on(drag, 'pointermove', event => { if (!dragging) return; const e = event as PointerEvent; savedPosition = { x: dragging.left + e.clientX - dragging.x, y: dragging.top + e.clientY - dragging.y }; clampShell(); });
-  on(drag, 'pointerup', () => { dragging = undefined; void chrome.storage.local.set({ toolbarPosition: savedPosition }).catch(() => {}); });
+  for (const drag of shell.querySelectorAll<HTMLButtonElement>('.drag,.handle')) {
+    let dragging: { x: number; y: number; left: number; top: number; moved: boolean } | undefined;
+    on(drag, 'pointerdown', event => {
+      const e = event as PointerEvent; if (e.button !== 0) return;
+      const r = shell.getBoundingClientRect(); draggedHandle = false;
+      dragging = { x: e.clientX, y: e.clientY, left: r.left, top: r.top, moved: false }; drag.setPointerCapture(e.pointerId); e.preventDefault();
+    });
+    on(drag, 'pointermove', event => {
+      if (!dragging) return;
+      const e = event as PointerEvent, dx = e.clientX - dragging.x, dy = e.clientY - dragging.y;
+      if (!dragging.moved && Math.hypot(dx, dy) < 4) return;
+      dragging.moved = true; savedPosition = { x: dragging.left + dx, y: dragging.top + dy }; clampShell();
+    });
+    on(drag, 'pointerup', () => {
+      if (dragging?.moved) { draggedHandle = drag.classList.contains('handle'); void chrome.storage.local.set({ toolbarPosition: savedPosition }).catch(() => {}); }
+      dragging = undefined;
+    });
+    on(drag, 'pointercancel', () => { dragging = undefined; draggedHandle = false; });
+  }
   on(document, 'pointermove', event => {
     if (!status.startsWith('picking')) return;
     const e = event as PointerEvent; if (e.composedPath().includes(host)) return;
@@ -413,6 +442,7 @@ async function initialize() {
   }, true);
   on(document, 'visibilitychange', () => { if (document.hidden && status === 'playing') pause('Paused while this tab is hidden.'); });
   on(window, 'resize', () => { invalidate(); clampShell(); });
+  on(matchMedia('(prefers-color-scheme: dark)'), 'change', invalidate);
   on(window, 'popstate', dispose); on(window, 'hashchange', dispose); on(window, 'pagehide', dispose);
   on(document, 'load', invalidate, true);
   on(document.fonts, 'loadingdone', invalidate);
