@@ -1,4 +1,10 @@
 export const walkthroughHTML = `
+  <h2>Learn on a blog</h2>
+  <p>Use your current article, or open the example in a new tab. We’ll practise picking a word, speed, Space to pause/resume, and Esc.</p>
+  <button class="primary tour-current">Use this page</button>
+  <button class="area tour-example">Open example blog ↗</button>
+  <p class="welcome-note">Example: “What happens when you pay over Lightning” on Substack. On the new tab, click WordGlide → Use this page to grant access and begin.</p>
+  <details class="practice"><summary>Practise here instead</summary>
   <p class="tour-progress" aria-live="polite">Step 1 of 3 · Choose a word</p>
   <h2 tabindex="-1">Try it here first.</h2>
   <p class="tour-instruction">Click any word below to choose where reading begins.</p>
@@ -6,9 +12,10 @@ export const walkthroughHTML = `
   <label class="tour-speed" hidden>Practice speed <output>250 WPM</output><input aria-label="Practice words per minute" type="range" min="120" max="500" step="10" value="250"></label>
   <button class="primary tour-play" hidden>Play practice</button>
   <button class="primary tour-next" disabled>Next</button>
-  <p class="welcome-note">This is a practice passage, not your page. On an article, use Set start word, optionally Set end word, then Play. Space pauses; the floating handle reopens settings.</p>
+  <p class="welcome-note">Space pauses and resumes. Esc pauses. On a blog, the floating handle reopens settings; Set end chooses the last word.</p>
   <button class="primary intro-start" hidden>Choose my start word</button>
   <button class="area tour-back" hidden>Back</button>
+  </details>
   <button class="area intro-dismiss">Skip tutorial — show controls</button>
 `;
 

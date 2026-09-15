@@ -14,7 +14,9 @@ The ready-to-load extension is in `dist/` after building.
 
 After rebuilding, click **Reload** on the extension card. Reload an already-open article if its old controls are still present; reactivating the extension also removes the old overlay.
 
-On first opening, an interactive walkthrough lets you select a sample word, change practice speed, and try playing/pausing. Practice stays inside the tutorial and does not alter your page or saved speed. Skip it anytime, or click **?** beside WordGlide to practise again. Your existing speed preferences are preserved when updating.
+On first opening (or via **?**), choose **Use this page** for an on-page walkthrough. It follows your actual actions: pick a word, change WPM, use **Space to start, pause, and resume**, then **Esc to pause**. Tutorial speed changes are real settings. You can exit or start over anytime.
+
+**Open example blog** opens the linked Substack article only when you choose it. On that new tab, click WordGlide → **Use this page** to grant temporary page access and begin. No extra site permissions are requested. A small offline practice passage remains available under **Practise here instead**; it does not change page settings. Subscription dialogs or inaccessible content must be handled by the user; the tutorial does not bypass them.
 
 ## Read a passage
 
@@ -22,7 +24,7 @@ On first opening, an interactive walkthrough lets you select a sample word, chan
 - **Set start word** lets you click any eligible word. **Set end word** chooses the inclusive final word. Without an explicit end, reading continues to the end of the article.
 - **Choose a different reading area** highlights the prose container under your mouse; click to choose it, then select your first word.
 - Choose **Cursor**, **Highlight**, or **Outline**. This is a visual guide; your real mouse remains available.
-- In Cursor mode, choose a **Hand** (default), **Dot**, or **Arrow**. Adjust **Size** from 12–40 px. **Stroke thickness** adjusts the hand/arrow or word outline; the dot uses the size control.
+- In Cursor mode, choose a **Hand** (default), **Dot**, or **Arrow**. Dot size is **1–30 px** (actual visible diameter); hand/arrow size is **12–40 px**. **Stroke** adjusts the hand/arrow or word outline.
 - **Hand, Dot, and Arrow** glide continuously across each word and the gap to the next. The dot adds a short fading trail. Cursor tips stay close to the text at every size. Highlight and outline ease into each word/group. Line returns reposition directly without a diagonal trail. System reduced-motion preferences disable travel and trails.
 - Choose a standard cursor/outline color: **green, blue, purple, red, orange, or black**.
 - In Highlight mode, select **1–4 words per highlight**. Groups stop at line/paragraph boundaries and your selected end word. Each group receives the combined reading time of its words, so 250 WPM is still 250 words per minute, not 250 groups.
@@ -32,7 +34,7 @@ On first opening, an interactive walkthrough lets you select a sample word, chan
 
 With a reading session active, **Space** plays/pauses, **Escape** pauses or cancels selection, and **Alt+Left / Alt+Right** steps through words. Inputs and editable fields retain their normal typing behavior.
 
-The guide pauses when you interact with or manually scroll the page, switch tabs, or open a modal/fullscreen surface. Resume explicitly. If a page edit removes your selected text, select your passage again.
+Auto-scroll accelerates and decelerates gently over 450–1,800ms depending on distance. System reduced-motion preferences still use immediate repositioning. The guide pauses when you interact with or manually scroll the page, switch tabs, or open a modal/fullscreen surface. Resume explicitly. If a page edit removes your selected text, select your passage again.
 
 ## Supported content
 
@@ -65,4 +67,4 @@ Browser tests load a temporary extension copy with host permission **only for th
 
 ## Privacy
 
-The extension runs locally on pages where you activate it. It requests temporary access to the current tab, script injection, and local preference storage. It stores speed, guide mode, cursor appearance, pause/scroll preferences, toolbar position, and whether you dismissed the introduction. It does not send article text to a server, record reading history, or use analytics.
+The extension runs locally on pages where you activate it. It requests temporary access to the current tab, script injection, and local preference storage. It stores speed, guide mode, cursor appearance, pause/scroll preferences, toolbar position, and whether you dismissed the introduction. An opt-in example tutorial temporarily stores its tab ID in browser-session storage. It does not send article text to a server, record reading history, or use analytics. Opening the external example blog makes a normal browser request to Substack.

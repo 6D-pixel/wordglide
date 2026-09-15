@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { defaults, segmentText, sanitizeSettings, durationFor, travelDuration } from '../src/core.ts';
+import { defaults, segmentText, sanitizeSettings, durationFor, travelDuration, scrollDuration, scrollEase } from '../src/core.ts';
 
 test('segments whitespace, punctuation, unicode and non-breaking spaces', () => {
   const tokens = segmentText('Hello, world! Café\u00a0reader.');
@@ -54,4 +54,16 @@ test('group size and palette are bounded and migrate safely', () => {
   assert.equal(sanitizeSettings({ groupSize: -3 }).groupSize, 1);
   assert.equal(sanitizeSettings({ color: 'blue' }).color, 'blue');
   assert.equal(sanitizeSettings({ color: 'invalid' as any }).color, 'green');
+});
+test('dot sizes use 1–30 pixels while hand and arrow retain 12–40', () => {
+  assert.equal(sanitizeSettings({ cursorShape: 'dot', cursorSize: 0 }).cursorSize, 1);
+  assert.equal(sanitizeSettings({ cursorShape: 'dot', cursorSize: 99 }).cursorSize, 30);
+  assert.equal(sanitizeSettings({ cursorShape: 'hand', cursorSize: 1 }).cursorSize, 12);
+  assert.equal(sanitizeSettings({ cursorShape: 'arrow', cursorSize: 99 }).cursorSize, 40);
+});
+test('scroll easing starts and stops gently and scales with distance', () => {
+  assert.equal(scrollEase(0), 0); assert.equal(scrollEase(1), 1);
+  assert.ok(scrollEase(.01) < .001); assert.ok(1 - scrollEase(.99) < .001);
+  assert.ok(scrollDuration(600) > scrollDuration(100));
+  assert.equal(scrollDuration(10000), 1800);
 });

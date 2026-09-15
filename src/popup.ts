@@ -16,7 +16,7 @@ async function send(command: Command) {
     const reply: Reply = await chrome.tabs.sendMessage(tabId!, { channel: 'wordglide', command });
     if (!reply.ok) throw new Error(reply.error);
     error.textContent = ''; update(reply.snapshot);
-    if (command.type.startsWith('pick-')) window.close();
+    if (command.type.startsWith('pick-') || command.type === 'tour-start') window.close();
   } catch (e) { error.textContent = e instanceof Error ? e.message : String(e); }
 }
 void (async () => {

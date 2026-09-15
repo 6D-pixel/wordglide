@@ -52,6 +52,16 @@ export function mountControls(container: HTMLElement, send: (command: Command) =
     const button = (event.target as Element).closest<HTMLButtonElement>('button');
     if (!button) return;
     if (button.classList.contains('help')) { onHelp(); showIntro(true); welcome.scrollIntoView({ block: 'nearest' }); return; }
+    if (button.classList.contains('tour-current')) { await dismissIntro(); send({ type: 'tour-start' }); return; }
+    if (button.classList.contains('tour-example')) {
+      button.disabled = true;
+      try {
+        const reply = await chrome.runtime.sendMessage({ type: 'open-tutorial' });
+        if (!reply?.ok) throw new Error('Could not open the example');
+      } catch { button.textContent = 'Could not open — try again'; }
+      finally { button.disabled = false; }
+      return;
+    }
     if (button.classList.contains('intro-dismiss') || button.classList.contains('intro-start')) {
       await dismissIntro();
       if (button.classList.contains('intro-start')) send({ type: 'pick-start' });
@@ -94,6 +104,10 @@ export function mountControls(container: HTMLElement, send: (command: Command) =
     controls.querySelectorAll<HTMLInputElement>('input[type="number"],input[type="range"]:not([data-appearance])').forEach(el => { if (el !== (container.getRootNode() as Document | ShadowRoot).activeElement) el.value = String(next.settings.wpm); });
     container.querySelectorAll<HTMLInputElement>('[data-appearance]').forEach(el => { if (el !== (container.getRootNode() as Document | ShadowRoot).activeElement) el.value = String(next.settings[el.dataset.appearance as 'cursorSize' | 'thickness']); });
     set('.size-value', `${next.settings.cursorSize} px`); set('.thickness-value', String(next.settings.thickness));
+    const sizeInput = container.querySelector<HTMLInputElement>('[data-appearance="cursorSize"]')!;
+    sizeInput.min = next.settings.cursorShape === 'dot' ? '1' : '12';
+    sizeInput.max = next.settings.cursorShape === 'dot' ? '30' : '40';
+    sizeInput.value = String(next.settings.cursorSize);
     container.querySelectorAll<HTMLButtonElement>('[data-shape]').forEach(el => el.setAttribute('aria-pressed', String(el.dataset.shape === next.settings.cursorShape)));
     container.querySelectorAll<HTMLButtonElement>('[data-color]').forEach(el => el.setAttribute('aria-pressed', String(el.dataset.color === next.settings.color)));
     (container.querySelector('.group-option') as HTMLElement).hidden = next.settings.mode !== 'highlight';
@@ -104,5 +118,5 @@ export function mountControls(container: HTMLElement, send: (command: Command) =
     container.querySelectorAll<HTMLButtonElement>('[data-mode]').forEach(el => { el.setAttribute('aria-pressed', String(el.dataset.mode === next.settings.mode)); });
     container.querySelectorAll<HTMLInputElement>('[data-setting]').forEach(el => { el.checked = next.settings[el.dataset.setting as 'natural' | 'autoScroll']; });
   };
-  return Object.assign(update, { isIntroOpen: () => introOpen, dispose: () => { disposed = true; tour.dispose(); chrome.storage.onChanged.removeListener(storageListener); } });
+  return Object.assign(update, { closeIntro: () => showIntro(false), isIntroOpen: () => introOpen, dispose: () => { disposed = true; tour.dispose(); chrome.storage.onChanged.removeListener(storageListener); } });
 }

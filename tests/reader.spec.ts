@@ -296,10 +296,10 @@ test('cursor shape, size and thickness controls persist independently of WPM', a
   const { page, tabId } = await open();
   await expect(page.locator('.marker')).toHaveAttribute('data-shape', 'hand');
   await page.locator('[data-shape="dot"]').filter({ has: page.locator('span') }).click();
-  await page.getByRole('slider', { name: 'Cursor size', exact: true }).fill('36');
+  await page.getByRole('slider', { name: 'Cursor size', exact: true }).fill('30');
   let state = await command(tabId, { type: 'snapshot' });
-  expect(state.settings).toMatchObject({ cursorShape: 'dot', cursorSize: 36, wpm: 250 });
-  await expect(page.locator('.marker')).toHaveCSS('width', '36px');
+  expect(state.settings).toMatchObject({ cursorShape: 'dot', cursorSize: 30, wpm: 250 });
+  await expect(page.locator('.marker')).toHaveCSS('width', '30px');
   await expect(page.locator('.marker svg circle')).toHaveCount(1);
   await page.locator('button[data-shape="hand"]').click();
   await page.getByRole('slider', { name: 'Stroke thickness', exact: true }).fill('3.5');
@@ -308,7 +308,7 @@ test('cursor shape, size and thickness controls persist independently of WPM', a
   await command(tabId, { type: 'dispose' });
   await worker.evaluate(async id => { await chrome.scripting.executeScript({ target: { tabId: id }, files: ['content.js'] }); }, tabId);
   const restored = await command(tabId, { type: 'snapshot' });
-  expect(restored.settings).toMatchObject({ cursorShape: 'hand', cursorSize: 36, thickness: 3.5 });
+  expect(restored.settings).toMatchObject({ cursorShape: 'hand', cursorSize: 30, thickness: 3.5 });
   await page.screenshot({ path: 'test-results/appearance.png' });
   await page.close();
 });
@@ -327,6 +327,7 @@ test('first-use introduction can be dismissed, reopened, and stays dismissed on 
   await page.getByRole('button', { name: 'Expand reading controls' }).click();
   await page.getByRole('button', { name: 'How to use WordGlide' }).click();
   await expect(page.locator('.welcome')).toBeVisible();
+  await page.locator('.practice summary').click();
   await expect(page.locator('.tour-next')).toBeDisabled();
   await page.locator('[data-tour-word="1"]').click();
   await page.locator('.tour-next').click();
@@ -354,6 +355,7 @@ test('popup introduction does not require page access and migrates existing pref
   await expect(popup.locator('.welcome')).toBeVisible();
   await expect(popup.locator('.intro-start')).toHaveText('Choose my start word');
   await popup.locator('body').screenshot({ path: 'test-results/welcome-popup.png' });
+  await popup.locator('.practice summary').click();
   await popup.locator('[data-tour-word="0"]').click();
   await popup.locator('.tour-next').click();
   await popup.getByRole('slider', { name: 'Practice words per minute' }).fill('300');
@@ -501,10 +503,10 @@ test('dot edge stays close to text at every size and controls fit a small panel'
     const range = document.createRange(); range.setStart(el.firstChild!, 0); range.setEnd(el.firstChild!, 5);
     return range.getBoundingClientRect().bottom;
   });
-  for (const cursorSize of [12, 24, 40]) {
+  for (const cursorSize of [1, 12, 30]) {
     await command(tabId, { type: 'settings', settings: { cursorShape: 'dot', cursorSize } });
     const box = (await page.locator('.marker').boundingBox())!;
-    const visibleTop = box.y + cursorSize * 6.25 / 32;
+    const visibleTop = box.y;
     expect(visibleTop - bottom).toBeCloseTo(1, 1);
   }
   await command(tabId, { type: 'settings', settings: { cursorShape: 'hand', cursorSize: 24 } });
@@ -512,5 +514,86 @@ test('dot edge stays close to text at every size and controls fit a small panel'
   expect(panel.width).toBeLessThanOrEqual(280); expect(panel.height).toBeLessThan(520);
   await expect(page.getByRole('button', { name: 'Set end word' })).toBeInViewport();
   await page.screenshot({ path: 'test-results/compact-controls.png' });
+  await page.close();
+});
+
+test('on-page tutorial teaches actual selection and Space pause/resume and Escape', async () => {
+  const { page, tabId } = await open({ intro: true });
+  await page.locator('.tour-current').click();
+  await expect(page.locator('.page-tour-title')).toHaveText('Tutorial · 1/6');
+  const first = await point(page, '#first', 'Start'); await page.mouse.click(first.x, first.y);
+  await expect(page.locator('.page-tour-title')).toHaveText('Tutorial · 2/6');
+  await expect(page.locator('.speed')).toHaveClass(/tour-target/);
+  await page.getByRole('spinbutton', { name: 'Words per minute' }).fill('200');
+  await page.keyboard.press('Tab');
+  await expect(page.locator('.page-tour-title')).toHaveText('Tutorial · 3/6');
+  for (const [key, step, status] of [['Space', '4', 'playing'], ['Space', '5', 'paused'], ['Space', '6', 'playing']] as const) {
+    await page.keyboard.press(key);
+    await expect(page.locator('.page-tour-title')).toHaveText(`Tutorial · ${step}/6`);
+    expect((await command(tabId, { type: 'snapshot' })).status).toBe(status);
+  }
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.page-tour-title')).toHaveText('You’re ready');
+  expect((await command(tabId, { type: 'snapshot' })).status).toBe('paused');
+  await page.screenshot({ path: 'test-results/on-page-tour.png' });
+  await page.locator('.page-tour').getByRole('button', { name: 'Done', exact: true }).click();
+  await expect(page.locator('.page-tour')).toBeHidden();
+  await page.close();
+});
+
+test('example blog opens only after consent and waits for extension activation', async () => {
+  const { page } = await open({ intro: true });
+  const url = 'https://quospiculum250256.substack.com/p/what-happens-when-you-pay-over-lightning';
+  // Offline stand-in: verify tab opening without contacting an external site.
+  await context.route(url, route => route.fulfill({ contentType: 'text/html', body: '<p>Example article</p>' }));
+  const before = context.pages().length;
+  await expect(page.locator('.tour-example')).toBeVisible();
+  expect(context.pages().length).toBe(before);
+  const opened = context.waitForEvent('page');
+  await page.locator('.tour-example').click();
+  const blog = await opened;
+  await expect(blog).toHaveURL(url);
+  await expect(blog.locator('[data-wordglide]')).toHaveCount(0);
+  await expect.poll(async () => await worker.evaluate(async () => (await chrome.storage.session.get('tutorialTab')).tutorialTab)).toEqual(expect.any(Number));
+  await blog.close(); await page.close(); await context.unroute(url);
+});
+
+test('auto-scroll uses many intermediate positions with gentle start and stop', async () => {
+  const { page, tabId } = await open();
+  await page.locator('#p8').scrollIntoViewIfNeeded();
+  await command(tabId, { type: 'pick-start' });
+  const target = await point(page, '#p8', 'Reading'); await page.mouse.click(target.x, target.y);
+  await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
+  const samples = page.evaluate(async () => {
+    const positions: number[] = []; const began = performance.now();
+    while (performance.now() - began < 2300) { await new Promise(requestAnimationFrame); positions.push(scrollY); }
+    return positions;
+  });
+  await command(tabId, { type: 'settings', settings: { wpm: 60 } });
+  await command(tabId, { type: 'play' });
+  const positions = await samples;
+  const deltas = positions.slice(1).map((y, i) => y - positions[i]).filter(d => d > 0);
+  expect(deltas.length).toBeGreaterThan(25);
+  expect(deltas[0]).toBeLessThan(Math.max(...deltas) / 3);
+  expect(deltas.at(-1)!).toBeLessThan(Math.max(...deltas) / 3);
+  expect((await command(tabId, { type: 'snapshot' })).status).toBe('playing');
+  await page.close();
+});
+
+test('popup starts a pending on-page tutorial and hands focus back to the article', async () => {
+  const { page, tabId } = await open({ intro: true });
+  await worker.evaluate(async id => { await chrome.storage.session.set({ tutorialTab: id }); }, tabId);
+  await command(tabId, { type: 'dispose' });
+  const popup = await context.newPage();
+  await popup.goto(`chrome-extension://${new URL(worker.url()).host}/popup.html`);
+  await page.bringToFront();
+  const closed = popup.waitForEvent('close');
+  await popup.locator('.tour-current').evaluate((el: HTMLButtonElement) => el.click());
+  await closed;
+  await expect(page.locator('.page-tour-title')).toHaveText('Tutorial · 1/6');
+  expect((await command(tabId, { type: 'snapshot' })).status).toBe('picking-start');
+  expect(await worker.evaluate(async () => (await chrome.storage.session.get('tutorialTab')).tutorialTab)).toBeUndefined();
+  await page.locator('.page-tour').getByRole('button', { name: 'Exit tutorial' }).click();
+  await expect(page.locator('.page-tour')).toBeHidden();
   await page.close();
 });

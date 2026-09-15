@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.0
+
+- Distance-based smooth auto-scroll with gentle acceleration/deceleration.
+- Dot diameter from 1–30px; hand/arrow retain their 12–40px range.
+- Real-page tutorial covering selection, speed, Space play/pause/resume, and Esc.
+- Opt-in example Substack blog, with explicit extension activation on the new tab; offline practice remains optional.
+
 ## 0.3.1
 
 - Hand and arrow now use the same continuous full-word sweep as the dot.

@@ -3,7 +3,7 @@ import { defaults, palette, type CursorShape, type Settings } from './core.ts';
 // Fixed viewBoxes preserve the proportions at every user-selected size.
 export function cursorIcon(shape: CursorShape): string {
   const common = 'viewBox="0 0 32 32" fill="#fffdf5" stroke="currentColor" stroke-width="var(--guide-stroke,2)" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"';
-  if (shape === 'dot') return `<svg ${common}><circle cx="16" cy="16" r="9" fill="currentColor" stroke="#fffdf5" stroke-width="1.5"/></svg>`;
+  if (shape === 'dot') return `<svg ${common}><circle cx="16" cy="16" r="16" fill="currentColor" stroke="none"/></svg>`;
   if (shape === 'arrow') return `<svg ${common}><path d="M7 3v24l6-6 5 9 5-3-5-9h9Z"/></svg>`;
   return `<svg ${common}><path d="M11 17V5a3 3 0 0 1 6 0v8a2.5 2.5 0 0 1 5 0v2a2.5 2.5 0 0 1 5 0v2a2 2 0 0 1 4 0v5c0 4-3 8-7 8h-8c-2.5 0-4-1-5.5-3L4 20a2.7 2.7 0 0 1 4-3.5l3 3.5Z" transform="translate(-1 0) scale(.97)"/></svg>`;
 }
@@ -129,7 +129,7 @@ export class Guide {
     // The visible tip/edge stays one pixel below the text range, independent
     // of SVG padding and selected size. The dot's white rim is included.
     const edge = r.bottom + 1;
-    const y = edge + size * 9.75 / 32;
+    const y = edge + size / 2;
     const dotShape = this.settings.cursorShape === 'dot';
     if (dotShape && animate && this.lastDot && Math.abs(y - this.lastDot.y) < 4 && x > this.lastDot.x && x - this.lastDot.x < 80) {
       const dot = document.createElement('i'); dot.className = 'trail-dot';
@@ -142,7 +142,7 @@ export class Guide {
     this.lastDot = { x, y };
     this.marker.style.display = 'block'; this.marker.style.transition = 'none';
     const anchorX = dotShape ? .5 : this.settings.cursorShape === 'hand' ? .394 : 7 / 32;
-    const anchorY = dotShape ? 6.25 / 32 : this.settings.cursorShape === 'hand' ? (1.94 - this.settings.thickness * .485) / 32 : (3 - this.settings.thickness / 2) / 32;
+    const anchorY = dotShape ? 0 : this.settings.cursorShape === 'hand' ? (1.94 - this.settings.thickness * .485) / 32 : (3 - this.settings.thickness / 2) / 32;
     this.marker.style.transform = `translate3d(${x - size * anchorX}px,${edge - size * anchorY}px,0)`;
   }
 }

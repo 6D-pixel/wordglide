@@ -12,7 +12,7 @@ export function sanitizeSettings(value: Partial<Settings> = {}): Settings {
     natural: typeof value.natural === 'boolean' ? value.natural : defaults.natural,
     autoScroll: typeof value.autoScroll === 'boolean' ? value.autoScroll : defaults.autoScroll,
     cursorShape: ['hand', 'dot', 'arrow'].includes(value.cursorShape ?? '') ? value.cursorShape! : defaults.cursorShape,
-    cursorSize: typeof value.cursorSize === 'number' && Number.isFinite(value.cursorSize) ? Math.max(12, Math.min(40, Math.round(value.cursorSize))) : defaults.cursorSize,
+    cursorSize: typeof value.cursorSize === 'number' && Number.isFinite(value.cursorSize) ? Math.max(value.cursorShape === 'dot' ? 1 : 12, Math.min(value.cursorShape === 'dot' ? 30 : 40, Math.round(value.cursorSize))) : defaults.cursorSize,
     thickness: typeof value.thickness === 'number' && Number.isFinite(value.thickness) ? Math.max(1, Math.min(4, Math.round(value.thickness * 2) / 2)) : defaults.thickness,
     color: Object.hasOwn(palette, value.color ?? '') ? value.color! : defaults.color,
     groupSize: typeof value.groupSize === 'number' && Number.isFinite(value.groupSize) ? Math.max(1, Math.min(4, Math.round(value.groupSize))) : 1,
@@ -51,5 +51,8 @@ export function travelDuration(duration: number, newLine: boolean): number {
 
 export type Status = 'idle' | 'ready' | 'playing' | 'paused' | 'picking-start' | 'picking-end' | 'picking-area' | 'finished';
 export type Snapshot = { status: Status; settings: Settings; index: number; start: number; end: number; count: number; word: string; message: string; title: string };
-export type Command = { type: 'snapshot' | 'play' | 'pause' | 'stop' | 'dispose' | 'pick-start' | 'pick-end' | 'pick-area' | 'step' | 'settings'; delta?: number; settings?: Partial<Settings> };
+export type Command = { type: 'snapshot' | 'play' | 'pause' | 'stop' | 'dispose' | 'pick-start' | 'pick-end' | 'pick-area' | 'step' | 'settings' | 'tour-start'; delta?: number; settings?: Partial<Settings> };
+
+export function scrollDuration(distance: number): number { return Math.max(450, Math.min(1800, Math.abs(distance) * 1.8)); }
+export function scrollEase(progress: number): number { return progress * progress * (3 - 2 * progress); }
 export type Reply = { ok: true; snapshot: Snapshot } | { ok: false; error: string };

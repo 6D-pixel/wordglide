@@ -1,8 +1,9 @@
 import css from '../styles.css';
-import { defaults, sanitizeSettings, durationFor, travelDuration, type Settings, type Status, type Command, type Snapshot, type Reply } from './core.ts';
+import { defaults, sanitizeSettings, durationFor, travelDuration, scrollDuration, scrollEase, type Settings, type Status, type Command, type Snapshot, type Reply } from './core.ts';
 import { detectRoot, indexRoot, rectangles, tokenAtPoint, readable, type Token } from './text.ts';
 import { mountControls } from './ui.ts';
 import { Guide, guideCSS } from './guide.ts';
+import { PageTour } from './page-tour.ts';
 
 type Runtime = { build: string; dispose: () => void; reveal: () => void };
 const context = globalThis as typeof globalThis & { __wordglide?: Runtime };
@@ -67,6 +68,7 @@ async function initialize() {
   shadow.append(preview, hint, shell);
   document.documentElement.append(host);
   const renderUI = mountControls(shell.querySelector('.panel')!, command => { try { dispatch(command); } catch (error) { message = String(error); publish(); } }, () => pause('Paused while you read the quick guide.'));
+  const pageTour = new PageTour(shadow, () => { pause(); leavePicking(); setCollapsed(false); publish(); }, () => dispatch({ type: 'tour-start' }));
 
   function snapshot(): Snapshot {
     return { status, settings, index, start, end, count: tokens.length, word: tokens[index]?.text ?? '', message, title: root?.querySelector('h1,h2')?.textContent?.trim().slice(0, 100) ?? document.title };
@@ -180,7 +182,7 @@ async function initialize() {
     const height = bounds.bottom - bounds.top;
     if (r.top >= bounds.top && r.bottom <= bounds.top + height * .75) { scrollAttempts = 0; return false; }
     if (!settings.autoScroll) { pause('The next word is outside the reading area. Scroll to it, then resume.'); return true; }
-    const delta = r.top - (bounds.top + height * .4);
+    const delta = r.top - (bounds.top + height * .55);
     const from = bounds.scroller.scrollTop;
     const target = Math.max(0, Math.min(bounds.scroller.scrollHeight - bounds.scroller.clientHeight, from + delta));
     if (Math.abs(target - from) < 1) {
@@ -189,14 +191,14 @@ async function initialize() {
     }
     if (scrollAttempts >= 2) { pause('The page is preventing scrolling. Move to the word manually, then resume.'); return true; }
     scrollAttempts++;
-    scrollTask = { scroller: bounds.scroller, target, from, expected: from, began: performance.now(), duration: reduced.matches ? 0 : 220, done, epoch };
+    scrollTask = { scroller: bounds.scroller, target, from, expected: from, began: performance.now(), duration: reduced.matches ? 0 : scrollDuration(target - from), done, epoch };
     raf = requestAnimationFrame(animateScroll); return true;
   }
   function animateScroll(now: number) {
     const task = scrollTask;
     if (!task || task.epoch !== epoch || status !== 'playing') return;
     const progress = task.duration ? Math.min(1, (now - task.began) / task.duration) : 1;
-    const eased = 1 - (1 - progress) ** 3;
+    const eased = scrollEase(progress);
     task.expected = task.from + (task.target - task.from) * eased;
     // Instant writes give us an exact owned trajectory that manual deltas can interrupt.
     task.scroller.scrollTo({ top: task.expected, behavior: 'instant' });
@@ -264,6 +266,11 @@ async function initialize() {
   function dispatch(command: Command): Snapshot {
     switch (command.type) {
       case 'snapshot': break;
+      case 'tour-start':
+        void chrome.storage.local.set({ onboardingSeen: true });
+        renderUI.closeIntro(); pageTour.start();
+        dispatch({ type: 'pick-start' });
+        break;
       case 'play': play(); break;
       case 'pause': pause('Paused. Resume whenever you are ready.'); break;
       case 'stop': pause(); leavePicking(); index = start; elapsed = 0; status = tokens.length ? 'ready' : 'idle'; message = 'Back at the beginning of your passage.'; drawStatic(); break;
@@ -280,6 +287,7 @@ async function initialize() {
         guide.configure(settings);
         if (settings.mode !== previous.mode || settings.groupSize !== previous.groupSize) elapsed = 0;
         if (playing) play(); else drawStatic();
+        if (settings.wpm !== previous.wpm) pageTour.advance('speed');
         break;
       }
       case 'dispose': dispose(); break;
@@ -375,6 +383,7 @@ async function initialize() {
         if (status === 'picking-start') { start = index = token.id; if (end < start) end = tokens.length - 1; }
         else { end = token.id; index = start; }
         elapsed = 0; leavePicking(); status = 'ready'; message = 'Passage selected. Press Play when you are ready.'; setCollapsed(false); drawStatic(); publish();
+        pageTour.advance('selected');
       }
     } else if (status === 'playing') pause('Paused while you interact with the page.');
   }, true);
@@ -397,8 +406,8 @@ async function initialize() {
     const target = e.composedPath()[0] as Element;
     if (renderUI.isIntroOpen()) return;
     if (target instanceof Element && target.closest('input,textarea,select,[contenteditable]:not([contenteditable="false"])')) return;
-    if (e.key === 'Escape') { e.preventDefault(); pause(); leavePicking(); message = 'Paused. Press Space to resume.'; publish(); }
-    else if (e.code === 'Space' && !e.altKey && !e.ctrlKey && !e.metaKey) { e.preventDefault(); if (status === 'playing') pause('Paused. Press Space to resume.'); else play(); }
+    if (e.key === 'Escape') { e.preventDefault(); pause(); leavePicking(); message = 'Paused. Press Space to resume.'; pageTour.advance('escape'); publish(); }
+    else if (e.code === 'Space' && !e.altKey && !e.ctrlKey && !e.metaKey) { e.preventDefault(); if (status === 'playing') { pause('Paused. Press Space to resume.'); pageTour.advance('space-pause'); } else { play(); if (snapshot().status === 'playing') pageTour.advance('space-play'); } }
     else if (e.altKey && ['ArrowLeft', 'ArrowRight'].includes(e.key)) { e.preventDefault(); dispatch({ type: 'step', delta: e.key === 'ArrowLeft' ? -1 : 1 }); }
     else if (['ArrowDown', 'ArrowUp', 'PageDown', 'PageUp', 'Home', 'End'].includes(e.key)) manual(e);
   }, true);
