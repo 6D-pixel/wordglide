@@ -1,69 +1,96 @@
 /* =========================================================================
-   The toolbar mark: the guide's dot, and the trail it leaves behind it.
+   The toolbar mark: the extension, doing its job, at 128 pixels.
 
-   An extension icon is a static PNG — Chrome does not animate them — so the
-   motion is drawn rather than played. That turns out to be the honest version
-   of the mark anyway: in the product the trail IS the motion, and a single
-   frame of it says "this thing moves" without a frame of animation.
+   It is not a logo with a dot next to it. It is the product's own geometry —
+   a word, and the guide gliding underneath it with its trail behind — where
+   the word happens to be WG. Anyone who has used the extension recognises the
+   picture before they read the letters, because it is the picture they have
+   been watching all the way down an article.
 
-   Everything here is a real number out of the extension rather than a
-   decision made for the icon:
+   An extension icon is a static PNG; Chrome does not animate them. That is
+   fine here, because in this product the trail IS the motion, so one frame of
+   it says the thing moves without a frame of animation.
 
-     ground   #0E1310   the dark reading ground the site uses
-     dot      #DC2626   core.ts palette.red — the guide, as the demo runs it
+   Every value comes out of the extension rather than out of a decision made
+   for the icon:
+
+     ground   #F9EDCA   guide.ts paints .fragment #edc961 at alpha 55/255 —
+                        composite that over white and you get this exactly.
+                        The tile is the colour the extension leaves on a word
+                        it has lit.
+     dot      #DC2626   core.ts palette.red, the colour the demo runs
      mark     dot diameter * 12/32, the ratio guide.ts drops its trail at,
-              fading in opacity only — the real trail does not taper
+              fading in opacity only, because the real trail does not taper
+     the dot sits UNDER the letters, the way guide.ts anchors it: top edge
+     just below the text, never on the baseline
 
-   The ground is dark on purpose. Red measures 3.88:1 on it and only 1.28:1
-   on the extension's own green, which is why the obvious "brand green tile"
-   is not what this is. In a light toolbar it reads as a dark tile with a red
-   comet on it; in a dark toolbar the tile melts into the chrome and the comet
-   is left floating, which is still the mark. Both are good outcomes; an ivory
-   tile would have done the reverse and glared in light mode.
+   Contrast on that ground: red 4.14:1, ink 14.49:1. The extension's own green
+   was the obvious tile and is unusable — red measures 1.28:1 on #386c46.
 
-   Sizes are tuned per size, not scaled from one drawing: four trail marks at
-   128px is a comet, and at 16px it is four grey pixels. Detail comes off as
-   the canvas shrinks and the dot grows to compensate.
+   Detail comes off as the canvas shrinks. Four trail marks at 128px is a
+   comet; at 16px it is four grey pixels, and two letters are mush, so the
+   smallest size keeps the thing that is still legible there: the dot.
 
-   Rendered through the Chromium that ships for the browser tests, so the PNGs
-   are reproducible from this file: npm run icons
+   Reproducible from this file — the letterforms come from the woff2 beside it
+   rather than from whatever the rendering machine has installed. That file is
+   build-time only; the extension ships the PNGs, not the font.
+
+     npm run icons
    ========================================================================= */
 
 import { chromium } from '@playwright/test';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, readFile } from 'node:fs/promises';
 
-const GROUND = '#0E1310';
+const GROUND = '#F9EDCA';
+const INK = '#241B14';
 const DOT = '#DC2626';
 
 /* Fractions of the tile, so every size is described the same way.
-   dot/mark are radii; gap is the centre-to-centre step back along the trail. */
+   dot/mark are radii; gap is the centre-to-centre step back along the trail;
+   base is the letters' baseline; drop is the clearance under it before the
+   dot's top edge, which is guide.ts's `r.bottom + 1` scaled to the tile. */
 const SIZES = [
-  { px: 128, dot: 0.205, mark: 0.077, gap: 0.145, marks: 4, x: 0.68 },
-  { px: 48, dot: 0.220, mark: 0.083, gap: 0.155, marks: 3, x: 0.68 },
-  { px: 32, dot: 0.245, mark: 0.095, gap: 0.185, marks: 2, x: 0.66 },
-  { px: 16, dot: 0.290, mark: 0.120, gap: 0.235, marks: 1, x: 0.62 },
+  { px: 128, word: true, type: 0.40, base: 0.50, drop: 0.045, dot: 0.100, mark: 0.038, gap: 0.088, marks: 4, x: 0.60 },
+  { px: 48, word: true, type: 0.42, base: 0.51, drop: 0.050, dot: 0.105, mark: 0.042, gap: 0.098, marks: 3, x: 0.60 },
+  { px: 32, word: true, type: 0.44, base: 0.52, drop: 0.055, dot: 0.115, mark: 0.048, gap: 0.115, marks: 2, x: 0.58 },
+  // 16px: the letters would be four grey pixels. The dot is what survives.
+  { px: 16, word: false, dot: 0.290, mark: 0.120, gap: 0.235, marks: 1, x: 0.62 },
 ];
 
 /* guide.ts holds a trail mark at 30% and lets it fall to nothing, over a page
-   that is usually light. On a near-black tile those same values go to mud —
-   a fading red has nowhere to fade to but the ground. The shape of the fade is
-   the product's; the values are lifted so the streak stays red the whole way
-   down instead of turning into three dark blobs. */
-const FADE = [0.95, 0.78, 0.55, 0.32];
+   that is usually light. This tile is light too, so the product's own shape of
+   fade works here as it stands. */
+const FADE = [0.62, 0.42, 0.27, 0.16];
 
-function svg({ px, dot, mark, gap, marks, x }) {
+function svg({ px, word, type, base, drop, dot, mark, gap, marks, x }) {
+  const r = px * dot;
+  // The dot hangs under the letters, not beside them: top edge below the
+  // baseline, exactly as the guide hangs under a line of text.
+  const cy = word ? px * base + px * drop + r : px / 2;
   const cx = px * x;
-  const cy = px / 2;
   const trail = Array.from({ length: marks }, (_, i) =>
-    `<circle cx="${(cx - px * gap * (i + 1)).toFixed(2)}" cy="${cy}" `
+    `<circle cx="${(cx - px * gap * (i + 1)).toFixed(2)}" cy="${cy.toFixed(2)}" `
     + `r="${(px * mark).toFixed(2)}" fill="${DOT}" opacity="${FADE[i]}"/>`).join('');
+  const letters = word
+    ? `<text x="${(px / 2).toFixed(2)}" y="${(px * base).toFixed(2)}" fill="${INK}" `
+      + `font-family="Plex Sans" font-weight="600" font-size="${(px * type).toFixed(2)}" `
+      + `letter-spacing="${(px * -0.012).toFixed(2)}" text-anchor="middle">WG</text>`
+    : '';
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${px}" height="${px}" `
     + `viewBox="0 0 ${px} ${px}">`
     + `<rect width="${px}" height="${px}" rx="${(px * 0.22).toFixed(2)}" fill="${GROUND}"/>`
-    + trail
-    + `<circle cx="${cx.toFixed(2)}" cy="${cy}" r="${(px * dot).toFixed(2)}" fill="${DOT}"/>`
+    + letters + trail
+    + `<circle cx="${cx.toFixed(2)}" cy="${cy.toFixed(2)}" r="${r.toFixed(2)}" fill="${DOT}"/>`
     + `</svg>`;
 }
+
+const face = (await readFile(new URL('plex-sans-600.woff2', import.meta.url))).toString('base64');
+const style = `<style>
+  @font-face { font-family: "Plex Sans"; font-weight: 600; font-style: normal;
+    src: url(data:font/woff2;base64,${face}) format("woff2"); }
+  html, body { margin: 0; padding: 0; background: transparent }
+  svg { display: block }
+</style>`;
 
 await mkdir('icons', { recursive: true });
 const browser = await chromium.launch();
@@ -72,9 +99,9 @@ for (const size of SIZES) {
     viewport: { width: size.px, height: size.px },
     deviceScaleFactor: 1,
   });
-  await page.setContent(
-    `<style>html,body{margin:0;padding:0;background:transparent}svg{display:block}</style>`
-    + svg(size));
+  await page.setContent(style + svg(size));
+  // Without this the text can paint in the fallback face on a cold cache.
+  await page.evaluate(() => document.fonts.ready);
   // omitBackground keeps the rounded corners transparent, so the tile sits on
   // a light or a dark toolbar without a square of the wrong colour around it.
   await page.screenshot({ path: `icons/icon-${size.px}.png`, omitBackground: true });

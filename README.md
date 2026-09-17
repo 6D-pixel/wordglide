@@ -71,9 +71,13 @@ They run at **1280×800**, which is a Chrome Web Store screenshot size, so the s
 
 ## The toolbar mark
 
-`npm run icons` redraws `icons/` from `scripts/icons.mjs`. It is the guide's dot and the trail it leaves, drawn still — an extension icon is a static PNG, so the motion is depicted rather than played, and in this product the trail *is* the motion.
+`npm run icons` redraws `icons/` from `scripts/icons.mjs`. It is not a logo with a dot beside it: it is the product's own geometry — a word, and the guide gliding underneath it with its trail behind — where the word happens to be WG. An extension icon is a static PNG, so the motion is depicted rather than played, which suits a product whose trail *is* the motion.
 
-Every value in it comes from the extension rather than from a decision made for the icon: `#DC2626` is `core.ts` `palette.red`, and the trail marks are the dot's diameter × 12/32, the ratio `guide.ts` drops them at. The ground is dark because red measures 3.88:1 on it and **1.28:1 on the extension's own green** — the obvious brand-green tile is unreadable, which is why this is not that.
+Every value comes from the extension rather than from a decision made for the icon. The ground `#F9EDCA` is `guide.ts`'s `.fragment` fill `#edc961` at alpha `55/255` composited over white — the colour the extension leaves on a word it has lit. `#DC2626` is `core.ts` `palette.red`. The trail marks are the dot's diameter × 12/32, the ratio `guide.ts` drops them at, fading in opacity only because the real trail does not taper. And the dot hangs *under* the letters with its top edge below the baseline, which is how `guide.ts` anchors it against a line of text.
+
+Red measures 4.14:1 on that ground and the ink 14.49:1. It is not the extension's green, tempting as that was: red measures **1.28:1 on `#386c46`** and is unreadable there.
+
+Detail comes off as the canvas shrinks. At 16px two letters are four grey pixels, so that size keeps the dot alone — and since Chrome uses the 32px icon on a HiDPI toolbar, the letters are what most people actually see. The letterforms come from the woff2 beside the script rather than from whatever the rendering machine has installed; it is build-time only, and the extension ships the PNGs, not the font.
 
 ## Publishing
 
