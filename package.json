@@ -7,7 +7,9 @@
     "build": "node scripts/build.mjs",
     "check": "tsc --noEmit",
     "test": "node --experimental-strip-types --test tests/core.test.ts",
-    "test:browser": "npm run build && playwright test"
+    "test:browser": "npm run build && playwright test",
+    "icons": "node scripts/icons.mjs",
+    "package": "node scripts/build.mjs --release && node scripts/package.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.55.0",

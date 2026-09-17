@@ -67,6 +67,34 @@ The build uses TypeScript and esbuild, with no runtime UI framework. The popup a
 
 Browser tests load a temporary extension copy with host permission **only for the local test server** to allow automation to inject. The shipping manifest keeps only `activeTab`, `scripting`, and `storage`. Tests exercise the real extension content runtime and messaging, but browser-toolbar permission gestures still need a manual install smoke test.
 
+They run at **1280×800**, which is a Chrome Web Store screenshot size, so the shots in `test-results/` are the shots the store listing uses. `reader.png`, `dot-trail.png`, `group-highlight.png`, `auto-color.png` and `on-page-tour.png` show the product doing the thing it is for.
+
+## The toolbar mark
+
+`npm run icons` redraws `icons/` from `scripts/icons.mjs`. It is the guide's dot and the trail it leaves, drawn still — an extension icon is a static PNG, so the motion is depicted rather than played, and in this product the trail *is* the motion.
+
+Every value in it comes from the extension rather than from a decision made for the icon: `#DC2626` is `core.ts` `palette.red`, and the trail marks are the dot's diameter × 12/32, the ratio `guide.ts` drops them at. The ground is dark because red measures 3.88:1 on it and **1.28:1 on the extension's own green** — the obvious brand-green tile is unreadable, which is why this is not that.
+
+## Publishing
+
+Brave is not a second submission. Brave installs from the Chrome Web Store, so one listing covers both.
+
+```sh
+npm run package      # release build, no source maps, then the zip
+```
+
+That writes `wordglide-<version>.zip` with `manifest.json` at the archive root, and refuses to write one that is missing a declared icon or that carries a source map — the two mistakes that get an upload rejected without saying which it was.
+
+Then, at the [developer dashboard](https://chrome.google.com/webstore/devconsole) (one-time $5 registration):
+
+1. Upload the zip.
+2. Screenshots: 1280×800 or 640×400. Take them from `test-results/`.
+3. Single purpose: a reading guide that moves a marker through the words of the page you are on, at a pace you set.
+4. Permission justifications — `activeTab` and `scripting`: the guide is injected into the current tab only when you click the toolbar button (`chrome.scripting.executeScript` in `background.ts`). There are no `content_scripts` and no host permissions. `storage`: your settings stay in the browser.
+5. Data usage: nothing is collected. The only outbound request in the codebase is `chrome.tabs.create` opening the walkthrough article, on an explicit button press.
+
+When the listing is live, the marketing site has two `<span class="btn--store is-pending">` blocks in `public/wordglide.html` (in the [rsvp-reader](https://github.com/6D-pixel/rsvp-reader) repo) that become `<a href>`. Its test fails if only one of them is changed.
+
 ## Privacy
 
 The extension runs locally on pages where you activate it. It requests temporary access to the current tab, script injection, and local preference storage. It stores speed, guide mode, cursor appearance, pause/scroll preferences, toolbar position, and whether you dismissed the introduction. An opt-in example tutorial temporarily stores its tab ID in browser-session storage. It does not send article text to a server, record reading history, or use analytics. Opening the external example blog makes a normal browser request to Substack.

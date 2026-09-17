@@ -21,7 +21,7 @@ test.beforeAll(async () => {
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
   base = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
   context = await chromium.launchPersistentContext(join(folder, 'profile'), {
-    ...(process.env.WORDGLIDE_BROWSER ? { executablePath: process.env.WORDGLIDE_BROWSER } : { channel: 'chromium' }), headless: true, viewport: { width: 1280, height: 900 },
+    ...(process.env.WORDGLIDE_BROWSER ? { executablePath: process.env.WORDGLIDE_BROWSER } : { channel: 'chromium' }), headless: true, viewport: { width: 1280, height: 800 },   // a Chrome Web Store screenshot size, so the shots these tests take are the shots the listing uses
     args: [`--disable-extensions-except=${extension}`, `--load-extension=${extension}`],
   });
   worker = context.serviceWorkers()[0] ?? await context.waitForEvent('serviceworker');
