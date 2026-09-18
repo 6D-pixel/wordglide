@@ -67,7 +67,9 @@ The build uses TypeScript and esbuild, with no runtime UI framework. The popup a
 
 Browser tests load a temporary extension copy with host permission **only for the local test server** to allow automation to inject. The shipping manifest keeps only `activeTab`, `scripting`, and `storage`. Tests exercise the real extension content runtime and messaging, but browser-toolbar permission gestures still need a manual install smoke test.
 
-They run at **1280×800**, which is a Chrome Web Store screenshot size, so the shots in `test-results/` are the shots the store listing uses. `reader.png`, `dot-trail.png`, `group-highlight.png`, `auto-color.png` and `on-page-tour.png` show the product doing the thing it is for.
+They run at **1280×800**, a Chrome Web Store screenshot size — but their screenshots are not the listing's. That fixture exists to prove the extension *excludes* things, so it contains a paragraph reading "Never read this navigation", a block reading "excluded code", and one sentence repeated twenty-eight times. Right for a test, and it looks like a broken draft in a shop window.
+
+`npm run shots` takes the listing's five instead: same harness — the real extension, loaded unpacked, driven through its own service worker — over an article written for the purpose, where every paragraph is different. They land in `store/screenshots/` beside the copy that describes them.
 
 ## The toolbar mark
 

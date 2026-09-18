@@ -122,13 +122,22 @@ Tick nothing collected, and certify:
     chrome.tabs.create opening the walkthrough's example article in a new
     tab, and only when you press that button.
 
-## Screenshots  (1280×800, from test-results/ after `npm run test:browser`)
+## Screenshots  (1280×800, `store/screenshots/`, from `npm run shots`)
 
-1. reader.png            the guide running on an article
-2. dot-trail.png         the dot and its trail mid-sweep
-3. group-highlight.png   highlight mode over a group of words
-4. auto-color.png        the guide adapting to a dark article
-5. on-page-tour.png      the walkthrough, on a real page
+Upload in this order. The first is the listing thumbnail, so it carries both
+halves of the pitch: the guide on the words, and the controls you can reach.
+
+1. `1-reading.png`          the guide under a line, panel open
+2. `2-dot-trail.png`        the dot at 550 wpm with its trail behind it
+3. `3-highlight-group.png`  highlight mode over three words at once
+4. `4-dark-article.png`     the same guide picking its own colour on a dark page
+5. `5-walkthrough.png`      the tutorial, running on the article itself
+
+NOT the shots in `test-results/`. Those come from the browser tests, whose
+fixture exists to prove the extension *excludes* things — it contains a
+paragraph reading "Never read this navigation", a block reading "excluded
+code", and one sentence repeated twenty-eight times. Right for a test, and it
+looks like a broken draft in a listing.
 
 ## Privacy policy URL
 

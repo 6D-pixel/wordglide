@@ -9,7 +9,8 @@
     "test": "node --experimental-strip-types --test tests/core.test.ts",
     "test:browser": "npm run build && playwright test",
     "icons": "node scripts/icons.mjs",
-    "package": "node scripts/build.mjs --release && node scripts/package.mjs"
+    "package": "node scripts/build.mjs --release && node scripts/package.mjs",
+    "shots": "npm run build && node scripts/shots.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.55.0",
