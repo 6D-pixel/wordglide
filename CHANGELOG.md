@@ -7,6 +7,7 @@
 - Auto colors adapt to light/dark article surfaces; manual selections stay saved.
 - Top-centered tutorial teaches Space; Esc is optional.
 - 120ms settling pause on new lines.
+- Extension name shortened to "WordGlide".
 
 ## 0.4.0
 
