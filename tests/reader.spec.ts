@@ -566,7 +566,9 @@ test('auto-scroll uses many intermediate positions with gentle start and stop', 
   await page.locator('#p8').scrollIntoViewIfNeeded();
   await command(tabId, { type: 'pick-start' });
   const target = await point(page, '#p8', 'Reading'); await page.mouse.click(target.x, target.y);
-  await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
+  // Wait for this scroll's event to be delivered before playing: arriving after play,
+  // it reads as the page moving on its own and pauses playback (seen on CI runners).
+  await page.evaluate(() => new Promise<void>(resolve => { addEventListener('scroll', () => resolve(), { once: true }); window.scrollTo({ top: 0, behavior: 'instant' }); }));
   const samples = page.evaluate(async () => {
     const positions: number[] = []; const began = performance.now();
     while (performance.now() - began < 2300) { await new Promise(requestAnimationFrame); positions.push(scrollY); }
@@ -576,7 +578,6 @@ test('auto-scroll uses many intermediate positions with gentle start and stop', 
   await command(tabId, { type: 'play' });
   const positions = await samples;
   const deltas = positions.slice(1).map((y, i) => y - positions[i]).filter(d => d > 0);
-  const snap = await command(tabId, { type: 'snapshot' }); console.log('DIAG', snap.status, JSON.stringify(snap.message), 'deltas', deltas.length, 'samples', positions.length, 'first', positions[0], 'last', positions.at(-1));
   expect(deltas.length).toBeGreaterThan(25);
   expect(deltas[0]).toBeLessThan(Math.max(...deltas) / 3);
   expect(deltas.at(-1)!).toBeLessThan(Math.max(...deltas) / 3);
