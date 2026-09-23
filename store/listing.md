@@ -13,7 +13,7 @@ Brave needs no second submission: it installs from this listing.
 
 ## Name
 
-    WordGlide — reading guide
+    WordGlide
 
 ## Short description  (from manifest.json, 86 chars, cap is 132)
 
