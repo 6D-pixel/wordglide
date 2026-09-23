@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.1
+
+- Keyboard shortcut to activate WordGlide on the current page: Alt+Shift+G (Option+Shift+G on Mac), changeable at chrome://extensions/shortcuts.
+- Extension name shortened to "WordGlide".
+- The speed − and + sit centered in their buttons.
+
 ## 0.5.0
 
 - Translucent, draggable circular logo in place of the WPM control pill.
@@ -7,7 +13,6 @@
 - Auto colors adapt to light/dark article surfaces; manual selections stay saved.
 - Top-centered tutorial teaches Space; Esc is optional.
 - 120ms settling pause on new lines.
-- Extension name shortened to "WordGlide".
 
 ## 0.4.0
 
