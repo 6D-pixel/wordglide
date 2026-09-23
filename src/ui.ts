@@ -12,7 +12,7 @@ export const controlsHTML = `
   <div class="progress-track"><div class="progress-fill"></div></div>
   <div class="progress-meta"><span class="position">No passage selected</span><span class="word"></span></div>
   <div class="transport"><button class="primary" data-command="play">▶ <span>Start reading</span></button><button class="secondary stop" data-command="stop" title="Stop and return to start" aria-label="Stop and return to start">■</button></div>
-  <div class="speed"><button data-speed="-10" aria-label="Slower">−</button><label><input aria-label="Words per minute" type="number" min="60" max="1000" step="10" value="250"><span>WPM</span></label><button data-speed="10" aria-label="Faster">+</button></div>
+  <div class="speed"><button data-speed="-10" aria-label="Slower"><svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M1 6h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button><label><input aria-label="Words per minute" type="number" min="60" max="1000" step="10" value="250"><span>WPM</span></label><button data-speed="10" aria-label="Faster"><svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M1 6h10M6 1v10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button></div>
   <input class="range" aria-label="Reading speed slider" type="range" min="60" max="1000" step="10" value="250">
   <div class="modes" role="group" aria-label="Reading guide style"><button data-mode="cursor"><span>↗</span>Cursor</button><button data-mode="highlight"><span>▰</span>Highlight</button><button data-mode="outline"><span>▱</span>Outline</button></div>
   <div class="appearance">
