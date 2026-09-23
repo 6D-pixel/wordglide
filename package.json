@@ -6,6 +6,7 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "check": "tsc --noEmit",
+    "lint": "eslint .",
     "test": "node --experimental-strip-types --test tests/core.test.ts",
     "test:browser": "npm run build && playwright test",
     "icons": "node scripts/icons.mjs",
@@ -13,10 +14,14 @@
     "shots": "npm run build && node scripts/shots.mjs"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.55.0",
     "@types/chrome": "^0.1.0",
     "@types/node": "^24.0.0",
     "esbuild": "^0.25.0",
-    "typescript": "^5.9.0"
+    "eslint": "^10.11.0",
+    "globals": "^17.12.0",
+    "typescript": "^5.9.0",
+    "typescript-eslint": "^8.70.1"
   }
 }

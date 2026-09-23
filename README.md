@@ -48,8 +48,11 @@ Browser-internal pages, the extension store, built-in PDF viewers, canvas text, 
 
 Requires Node.js 22.18+ (or a recent Node version with TypeScript type stripping).
 
+Every pull request and push to `main` runs the same steps in GitHub Actions (`.github/workflows/ci.yml`), then `npm run package`, and attaches the store zip to the run.
+
 ```sh
 npm install
+npm run lint
 npm run check
 npm test
 npm run build

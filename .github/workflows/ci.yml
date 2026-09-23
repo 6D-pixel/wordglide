@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      # Node 22.6+ is needed for --experimental-strip-types in `npm test`.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run check
+      - run: npm test
+
+      - name: Install Chromium for the browser tests
+        run: npx playwright install --with-deps chromium
+      - name: Browser tests (builds dist/ first)
+        run: npm run test:browser
+
+      # The same zip that goes to the Chrome Web Store, with its own checks:
+      # manifest at the root, no source maps, every declared icon present.
+      - name: Package for the store
+        run: npm run package
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wordglide-extension
+          path: wordglide-*.zip
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-results
+          path: test-results/
+          if-no-files-found: ignore

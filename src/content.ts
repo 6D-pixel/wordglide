@@ -30,7 +30,7 @@ async function initialize() {
   let epoch = 0;
   let elapsed = 0, began = 0, wordDuration = 0, lastFrame = 0;
   let lineHold = 0;
-  let rectCache = new Map<number, DOMRect[]>();
+  const rectCache = new Map<number, DOMRect[]>();
   let geometryDirty = true;
   let pickingPreview: Token | HTMLElement | undefined;
   let lastBroadcast = 0;
@@ -39,7 +39,6 @@ async function initialize() {
   const geometryRecovery = new Set<number>();
   let lastOwnedScroll: { scroller: HTMLElement; position: number; at: number } | undefined;
   let scrollAttempts = 0;
-  let collapsed = false;
   let savedPosition: { x: number; y: number } | undefined;
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
   const originalURL = location.href;
@@ -309,7 +308,7 @@ async function initialize() {
     }
     publish(); return snapshot();
   }
-  function setCollapsed(value: boolean) { collapsed = value; shell.classList.toggle('collapsed', value); clampShell(); }
+  function setCollapsed(value: boolean) { shell.classList.toggle('collapsed', value); clampShell(); }
   function clampShell() {
     if (!savedPosition) return;
     const r = shell.getBoundingClientRect();
