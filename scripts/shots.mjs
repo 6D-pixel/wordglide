@@ -222,7 +222,7 @@ const shot = async (tab, name) => {
 /* 5 — the walkthrough, on the article itself rather than a mock-up, which is
    the thing about it worth showing. */
 {
-  const { tab, tabId } = await open({ intro: true });
+  const { tab } = await open({ intro: true });
   await tab.locator('.tour-current').click();
   await tab.waitForSelector('.page-tour-title');
   await shot(tab, '5-walkthrough');
