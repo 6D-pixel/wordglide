@@ -7,7 +7,7 @@
     "build": "node scripts/build.mjs",
     "check": "tsc --noEmit",
     "lint": "eslint .",
-    "test": "node --experimental-strip-types --test tests/core.test.ts",
+    "test": "node --experimental-strip-types --test tests/core.test.ts tests/publish.test.ts",
     "test:browser": "npm run build && playwright test",
     "icons": "node scripts/icons.mjs",
     "package": "node scripts/build.mjs --release && node scripts/package.mjs",
